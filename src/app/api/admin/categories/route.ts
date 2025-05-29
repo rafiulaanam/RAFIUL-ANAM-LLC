@@ -1,0 +1,222 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import clientPromise from "@/lib/db";
+import { ObjectId } from "mongodb";
+
+// Helper function to create slug from name
+function createSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+// GET all categories
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session || session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const client = await clientPromise;
+    const db = client.db();
+    const categories = await db.collection("categories").find({}).toArray();
+
+    return NextResponse.json(categories);
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch categories" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST new category
+export async function POST(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session || session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { name, description } = await req.json();
+
+    if (!name) {
+      return NextResponse.json(
+        { error: "Name is required" },
+        { status: 400 }
+      );
+    }
+
+    const client = await clientPromise;
+    const db = client.db();
+
+    // Check if category with same name exists
+    const existingCategory = await db
+      .collection("categories")
+      .findOne({ name: { $regex: new RegExp(`^${name}$`, "i") } });
+
+    if (existingCategory) {
+      return NextResponse.json(
+        { error: "Category with this name already exists" },
+        { status: 400 }
+      );
+    }
+
+    const slug = createSlug(name);
+    const newCategory = {
+      name,
+      slug,
+      description: description || "",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: session.user.id,
+    };
+
+    const result = await db.collection("categories").insertOne(newCategory);
+    const category = await db
+      .collection("categories")
+      .findOne({ _id: result.insertedId });
+
+    return NextResponse.json(category);
+  } catch (error) {
+    console.error("Error creating category:", error);
+    return NextResponse.json(
+      { error: "Failed to create category" },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH update category
+export async function PATCH(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session || session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id, name, description, isActive } = await req.json();
+
+    if (!id || !name) {
+      return NextResponse.json(
+        { error: "ID and name are required" },
+        { status: 400 }
+      );
+    }
+
+    const client = await clientPromise;
+    const db = client.db();
+
+    // Check if another category with same name exists
+    const existingCategory = await db
+      .collection("categories")
+      .findOne({
+        name: { $regex: new RegExp(`^${name}$`, "i") },
+        _id: { $ne: new ObjectId(id) },
+      });
+
+    if (existingCategory) {
+      return NextResponse.json(
+        { error: "Category with this name already exists" },
+        { status: 400 }
+      );
+    }
+
+    const slug = createSlug(name);
+    const result = await db.collection("categories").updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          name,
+          slug,
+          description,
+          isActive,
+          updatedAt: new Date(),
+          updatedBy: session.user.id,
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 }
+      );
+    }
+
+    const updatedCategory = await db
+      .collection("categories")
+      .findOne({ _id: new ObjectId(id) });
+
+    return NextResponse.json(updatedCategory);
+  } catch (error) {
+    console.error("Error updating category:", error);
+    return NextResponse.json(
+      { error: "Failed to update category" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE category
+export async function DELETE(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session || session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Category ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const client = await clientPromise;
+    const db = client.db();
+
+    // Check if category is being used by any products
+    const productsUsingCategory = await db
+      .collection("products")
+      .findOne({ categoryId: new ObjectId(id) });
+
+    if (productsUsingCategory) {
+      return NextResponse.json(
+        { error: "Cannot delete category that is being used by products" },
+        { status: 400 }
+      );
+    }
+
+    const result = await db
+      .collection("categories")
+      .deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting category:", error);
+    return NextResponse.json(
+      { error: "Failed to delete category" },
+      { status: 500 }
+    );
+  }
+} 
