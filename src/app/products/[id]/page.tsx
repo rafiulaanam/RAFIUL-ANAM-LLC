@@ -13,7 +13,10 @@ interface Product {
   name: string;
   price: number;
   images: string[];
-  category: string;
+  category: {
+    _id: string;
+    name: string;
+  };
   brand: string;
   rating: number;
   reviews: number;
@@ -45,7 +48,12 @@ export default function ProductPage() {
           throw new Error(errorData.error || "Failed to fetch product");
         }
         const data = await response.json();
-        setProduct(data);
+        // Ensure images is always an array
+        const productData = {
+          ...data,
+          images: Array.isArray(data.images) ? data.images : data.image ? [data.image] : ['/placeholder-image.jpg']
+        };
+        setProduct(productData);
       } catch (error) {
         console.error("Error fetching product:", error);
         toast({
@@ -103,10 +111,10 @@ export default function ProductPage() {
           {/* Product Images */}
           <div className="space-y-4">
             {/* Main Image */}
-            <div className="relative h-[500px] rounded-xl overflow-hidden">
+            <div className="relative h-[500px] rounded-xl overflow-hidden bg-white">
               <Image
-                src={product?.images?.[selectedImage] || '/placeholder-image.jpg'}
-                alt={product?.name || 'Product image'}
+                src={product.images[selectedImage]}
+                alt={product.name}
                 fill
                 className="object-contain"
                 priority
@@ -114,15 +122,15 @@ export default function ProductPage() {
             </div>
             
             {/* Thumbnails */}
-            {product?.images && product.images.length > 1 && (
-              <div className="grid grid-cols-5 gap-2 mt-4">
+            {product.images.length > 1 && (
+              <div className="grid grid-cols-5 gap-2">
                 {product.images.map((image, index) => (
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
-                    className={`relative h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                    className={`relative h-20 rounded-lg overflow-hidden border-2 transition-all bg-white ${
                       selectedImage === index
-                        ? 'border-primary'
+                        ? 'border-primary ring-2 ring-primary ring-opacity-50'
                         : 'border-transparent hover:border-gray-300'
                     }`}
                   >
@@ -130,7 +138,7 @@ export default function ProductPage() {
                       src={image}
                       alt={`${product.name} thumbnail ${index + 1}`}
                       fill
-                      className="object-cover"
+                      className="object-contain p-1"
                     />
                   </button>
                 ))}
@@ -164,7 +172,7 @@ export default function ProductPage() {
             <div className="space-y-2">
               <div className="text-2xl font-bold">${product.price}</div>
               <div className="text-sm text-muted-foreground">
-                Category: <span className="capitalize">{product.category}</span>
+                Category: <span className="capitalize">{product.category.name}</span>
               </div>
               <div className="text-sm text-muted-foreground">
                 Brand: <span className="capitalize">{product.brand}</span>
