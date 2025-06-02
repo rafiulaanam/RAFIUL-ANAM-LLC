@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import clientPromise from "@/lib/db";
 import { authOptions } from "@/lib/auth";
-import { connectToDatabase } from "@/lib/db";
 
 interface Params {
   params: {
@@ -18,7 +18,7 @@ export async function PATCH(req: Request, { params }: Params) {
     }
 
     const { quantity } = await req.json();
-    const { db } = await connectToDatabase();
+    const { db } = await clientPromise();
 
     if (quantity <= 0) {
       await db.collection("carts").updateOne(
@@ -58,7 +58,7 @@ export async function DELETE(_: Request, { params }: Params) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const { db } = await connectToDatabase();
+    const { db } = await clientPromise();
     await db.collection("carts").updateOne(
       { userId: session.user.id },
       {

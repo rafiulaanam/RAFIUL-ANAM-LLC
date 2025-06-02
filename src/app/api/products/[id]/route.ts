@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { dbConnect } from '@/lib/db';
+import clientPromise from '@/lib/db';
 import Product from '@/models/product';
 import { ProductResponse } from '@/types/types';
+import { ObjectId } from "mongodb";
 
 // GET single product
 export async function GET(
@@ -9,7 +10,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    await dbConnect();
+    await clientPromise();
     const product = await Product.findById(params.id);
     
     if (!product) {

@@ -110,7 +110,7 @@ export default function AddProductPage() {
         images
       };
 
-      const response = await fetch("/api/products", {
+      const response = await fetch("/api/products/vendor", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

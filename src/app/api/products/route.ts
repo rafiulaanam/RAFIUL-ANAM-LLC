@@ -379,7 +379,7 @@ export async function DELETE(request: Request) {
           "vendor._id": new ObjectId(session.user.id)
         });
 
-      if (!product) {
+    if (!product) {
         return NextResponse.json(
           { success: false, error: "Product not found or you don't have permission to delete it" },
           { status: 404 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/db";
+import clientPromise from "@/lib/db";
 import Product from "@/models/Product";
 import User from "@/models/User";
 import Vendor from "@/models/Vendor";
@@ -15,7 +15,7 @@ export async function GET() {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    await connectToDatabase();
+    await clientPromise();
 
     // Get counts
     const [
