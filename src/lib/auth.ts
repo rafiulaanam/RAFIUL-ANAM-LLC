@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import clientPromise from "./db";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { MongoClient } from "mongodb";
+import { ObjectId } from "mongodb";
 
 let client: MongoClient;
 
@@ -134,27 +135,25 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
-      // Initial sign in
-      if (account && user) {
-        return {
-          ...token,
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          picture: user.image,
-          role: user.role || 'USER',
-        };
+    async jwt({ token, user, trigger, session }) {
+      if (trigger === "update" && session?.name) {
+        token.name = session.name;
       }
+
+      if (user) {
+        token.role = user.role;
+        token.id = user.id;
+      }
+
       return token;
     },
     async session({ session, token }) {
-      if (token && session.user) {
-        session.user.id = token.id as string;
+      if (session.user) {
+        session.user.role = token.role;
+        session.user.id = token.id;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
         session.user.image = token.picture as string | null;
-        session.user.role = token.role as string;
       }
       return session;
     },
@@ -177,4 +176,5 @@ export const authOptions: NextAuthOptions = {
     }
   },
   debug: process.env.NODE_ENV === 'development',
+  secret: process.env.NEXTAUTH_SECRET,
 }; 

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,94 +38,154 @@ import {
   MapPin,
   Package,
   Clock,
+  Loader2,
 } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 interface OrderItem {
-  id: string;
+  productId: string;
   name: string;
-  quantity: number;
   price: number;
+  quantity: number;
+  image: string;
 }
 
 interface Order {
-  id: string;
-  customerName: string;
-  email: string;
+  _id: string;
+  userId: string;
   items: OrderItem[];
+  shippingInfo: {
+    fullName: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+    notes?: string;
+  };
+  shippingMethod: string;
+  paymentMethod: string;
+  subtotal: number;
+  shippingCost: number;
+  tax: number;
   total: number;
   status: "pending" | "processing" | "shipped" | "delivered" | "cancelled";
-  shippingAddress: string;
-  paymentStatus: "paid" | "pending" | "failed";
+  paymentStatus: "pending" | "paid" | "failed";
   createdAt: string;
+  paidAt?: string;
+  updatedAt?: string;
 }
 
-const mockOrders: Order[] = [
-  {
-    id: "ORD001",
-    customerName: "John Doe",
-    email: "john@example.com",
-    items: [
-      { id: "1", name: "Wireless Headphones", quantity: 1, price: 99.99 },
-      { id: "2", name: "Smart Watch", quantity: 1, price: 199.99 },
-    ],
-    total: 299.98,
-    status: "pending",
-    shippingAddress: "123 Main St, City, Country",
-    paymentStatus: "paid",
-    createdAt: "2024-03-15T10:00:00",
-  },
-  {
-    id: "ORD002",
-    customerName: "Jane Smith",
-    email: "jane@example.com",
-    items: [
-      { id: "3", name: "Running Shoes", quantity: 1, price: 79.99 },
-    ],
-    total: 79.99,
-    status: "shipped",
-    shippingAddress: "456 Oak St, City, Country",
-    paymentStatus: "paid",
-    createdAt: "2024-03-14T15:30:00",
-  },
-  {
-    id: "ORD003",
-    customerName: "Mike Johnson",
-    email: "mike@example.com",
-    items: [
-      { id: "4", name: "Gaming Mouse", quantity: 2, price: 49.99 },
-    ],
-    total: 99.98,
-    status: "delivered",
-    shippingAddress: "789 Pine St, City, Country",
-    paymentStatus: "paid",
-    createdAt: "2024-03-13T09:15:00",
-  },
-];
+// Add helper functions for text formatting
+const capitalizeFirstLetter = (str: string | undefined) => {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : 'N/A';
+};
+
+const formatStatus = (status: string | undefined) => {
+  return status ? status.toUpperCase() : 'N/A';
+};
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // Handle authentication and role check
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    } else if (status === "authenticated" && session?.user?.role !== "VENDOR") {
+      router.push("/"); // Redirect non-vendors to home
+    }
+  }, [status, session, router]);
+
+  // Fetch orders
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const response = await fetch("/api/vendor/orders");
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to fetch orders");
+        }
+        const data = await response.json();
+        setOrders(data);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to fetch orders");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (session?.user && session.user.role === "VENDOR") {
+      fetchOrders();
+    }
+  }, [session]);
+
+  // Handle loading state
+  if (status === "loading" || loading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle unauthorized access
+  if (status === "unauthenticated" || session?.user?.role !== "VENDOR") {
+    return null; // Return null since useEffect will handle the redirect
+  }
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       searchQuery === "" ||
-      order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase());
+      order._id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.shippingInfo.fullName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const handleStatusChange = (orderId: string, newStatus: Order["status"]) => {
-    setOrders((prevOrders) =>
-      prevOrders.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    );
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/vendor/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update order status");
+      }
+
+      // Update local state with the returned updated order
+      setOrders((prevOrders) =>
+        prevOrders.map((order) =>
+          order._id === orderId ? { ...data } : order
+        )
+      );
+
+      toast.success("Order status updated successfully");
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to update order status");
+    }
   };
 
   const getStatusBadgeColor = (status: Order["status"]) => {
-    switch (status) {
+    if (!status) return "bg-gray-100 text-gray-800";
+    
+    switch (status.toLowerCase()) {
       case "pending":
         return "bg-yellow-100 text-yellow-800";
       case "processing":
@@ -140,7 +202,9 @@ export default function OrdersPage() {
   };
 
   const getPaymentStatusBadgeColor = (status: Order["paymentStatus"]) => {
-    switch (status) {
+    if (!status) return "bg-gray-100 text-gray-800";
+    
+    switch (status.toLowerCase()) {
       case "paid":
         return "bg-green-100 text-green-800";
       case "pending":
@@ -206,28 +270,27 @@ export default function OrdersPage() {
             </TableHeader>
             <TableBody>
               {filteredOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell className="font-medium">{order.id}</TableCell>
+                <TableRow key={order._id}>
+                  <TableCell className="font-medium">{order._id}</TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{order.customerName}</p>
-                      <p className="text-sm text-gray-500">{order.email}</p>
+                      <p className="font-medium">{order.shippingInfo?.fullName || 'N/A'}</p>
+                      <p className="text-sm text-gray-500">{order.shippingInfo?.email || 'N/A'}</p>
                     </div>
                   </TableCell>
-                  <TableCell>{order.items.length} items</TableCell>
-                  <TableCell>${order.total.toFixed(2)}</TableCell>
+                  <TableCell>{order.items?.length || 0} items</TableCell>
+                  <TableCell>${(order.total || 0).toFixed(2)}</TableCell>
                   <TableCell>
                     <Select
-                      value={order.status}
+                      value={order.status || "pending"}
                       onValueChange={(value: Order["status"]) =>
-                        handleStatusChange(order.id, value)
+                        updateOrderStatus(order._id, value)
                       }
                     >
                       <SelectTrigger className="w-[130px]">
                         <SelectValue>
                           <Badge className={getStatusBadgeColor(order.status)}>
-                            {order.status.charAt(0).toUpperCase() +
-                              order.status.slice(1)}
+                            {capitalizeFirstLetter(order.status)}
                           </Badge>
                         </SelectValue>
                       </SelectTrigger>
@@ -242,11 +305,11 @@ export default function OrdersPage() {
                   </TableCell>
                   <TableCell>
                     <Badge className={getPaymentStatusBadgeColor(order.paymentStatus)}>
-                      {order.paymentStatus.toUpperCase()}
+                      {formatStatus(order.paymentStatus)}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {new Date(order.createdAt).toLocaleDateString()}
+                    {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
                   </TableCell>
                   <TableCell className="text-right">
                     <Dialog>
@@ -258,7 +321,7 @@ export default function OrdersPage() {
                       </DialogTrigger>
                       <DialogContent className="max-w-3xl">
                         <DialogHeader>
-                          <DialogTitle>Order Details - {order.id}</DialogTitle>
+                          <DialogTitle>Order Details - {order._id}</DialogTitle>
                         </DialogHeader>
                         <div className="grid gap-6">
                           {/* Order Info */}
@@ -269,7 +332,7 @@ export default function OrdersPage() {
                                 Order Date:
                               </div>
                               <p className="font-medium">
-                                {new Date(order.createdAt).toLocaleString()}
+                                {order.createdAt ? new Date(order.createdAt).toLocaleString() : 'N/A'}
                               </p>
                             </div>
                             <div className="space-y-1">
@@ -277,8 +340,8 @@ export default function OrdersPage() {
                                 <User className="h-4 w-4" />
                                 Customer:
                               </div>
-                              <p className="font-medium">{order.customerName}</p>
-                              <p className="text-sm text-gray-500">{order.email}</p>
+                              <p className="font-medium">{order.shippingInfo?.fullName || 'N/A'}</p>
+                              <p className="text-sm text-gray-500">{order.shippingInfo?.email || 'N/A'}</p>
                             </div>
                           </div>
 
@@ -288,7 +351,11 @@ export default function OrdersPage() {
                               <MapPin className="h-4 w-4" />
                               Shipping Address:
                             </div>
-                            <p className="font-medium">{order.shippingAddress}</p>
+                            <p className="font-medium">
+                              {order.shippingInfo ? 
+                                `${order.shippingInfo.address}, ${order.shippingInfo.city}, ${order.shippingInfo.state}, ${order.shippingInfo.zipCode}, ${order.shippingInfo.country}` 
+                                : 'N/A'}
+                            </p>
                           </div>
 
                           {/* Order Items */}
@@ -308,13 +375,13 @@ export default function OrdersPage() {
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {order.items.map((item) => (
-                                    <TableRow key={item.id}>
+                                  {order.items?.map((item) => (
+                                    <TableRow key={item.productId}>
                                       <TableCell>{item.name}</TableCell>
                                       <TableCell>{item.quantity}</TableCell>
-                                      <TableCell>${item.price.toFixed(2)}</TableCell>
+                                      <TableCell>${(item.price || 0).toFixed(2)}</TableCell>
                                       <TableCell>
-                                        ${(item.quantity * item.price).toFixed(2)}
+                                        ${((item.quantity || 0) * (item.price || 0)).toFixed(2)}
                                       </TableCell>
                                     </TableRow>
                                   ))}
@@ -323,7 +390,7 @@ export default function OrdersPage() {
                                       Total:
                                     </TableCell>
                                     <TableCell className="font-medium">
-                                      ${order.total.toFixed(2)}
+                                      ${(order.total || 0).toFixed(2)}
                                     </TableCell>
                                   </TableRow>
                                 </TableBody>
@@ -340,7 +407,7 @@ export default function OrdersPage() {
                             <div className="space-y-4">
                               <div className="flex items-center gap-4">
                                 <Badge className={getStatusBadgeColor(order.status)}>
-                                  {order.status.toUpperCase()}
+                                  {formatStatus(order.status)}
                                 </Badge>
                                 <p className="text-sm text-gray-500">
                                   Current Status
