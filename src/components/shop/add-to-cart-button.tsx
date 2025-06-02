@@ -35,7 +35,6 @@ export function AddToCartButton({
       setIsLoading(true);
       await addItem({
         productId,
-        quantity: 1,
         price,
         name,
         image,

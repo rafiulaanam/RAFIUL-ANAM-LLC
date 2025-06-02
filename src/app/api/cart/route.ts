@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongoose";
+import { dbConnect } from "@/lib/db";
 import Cart from "@/models/Cart";
 import Product from "@/models/Product";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import clientPromise from "@/lib/db";
 
 // POST /api/cart - Add/Update item in cart
 export async function POST(req: NextRequest) {
   try {
     // Get user session
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    if (!session?.user?.email) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -19,7 +18,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Connect to database
-    await connectToDatabase();
+    await dbConnect();
 
     // Get request body
     const { productId, quantity } = await req.json();
@@ -42,7 +41,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Find existing cart or create new one
-    let cart = await Cart.findOne({ userId: session.user.id });
+    let cart = await Cart.findOne({ userId: session.user.email });
 
     if (cart) {
       // Cart exists - check if item exists
@@ -69,7 +68,7 @@ export async function POST(req: NextRequest) {
     } else {
       // Create new cart
       cart = await Cart.create({
-        userId: session.user.id,
+        userId: session.user.email,
         items: [{
           productId: product._id,
           quantity,
@@ -101,13 +100,12 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
+    await dbConnect();
     
-    const cart = await db.collection("carts").findOne(
-      { userEmail: session.user.email },
-      { projection: { items: 1, _id: 0 } }
-    );
+    const cart = await Cart.findOne(
+      { userId: session.user.email },
+      { items: 1, _id: 0 }
+    ).populate('items.productId');
 
     return NextResponse.json(cart?.items || []);
   } catch (error) {
@@ -128,10 +126,9 @@ export async function DELETE() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const client = await clientPromise;
-    const db = client.db();
+    await dbConnect();
     
-    await db.collection("carts").deleteOne({ userEmail: session.user.email });
+    await Cart.deleteOne({ userId: session.user.email });
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -5,34 +5,40 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 
 export type CartItem = {
-  id: string;
+  productId: string;
   name: string;
   price: number;
   quantity: number;
-  image?: string;
+  image: string;
+};
+
+export type Cart = {
+  items: CartItem[];
+  total: number;
 };
 
 export function useShoppingCart() {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [cart, setCart] = useState<Cart>({ items: [], total: 0 });
+  const [loading, setLoading] = useState(true);
   const { data: session } = useSession();
 
   // Load cart data
   useEffect(() => {
     const loadCart = async () => {
       if (!session?.user) {
-        setCart([]);
-        setIsLoading(false);
+        setCart({ items: [], total: 0 });
+        setLoading(false);
         return;
       }
 
       try {
-        setIsLoading(true);
+        setLoading(true);
         const response = await fetch("/api/cart");
         
         if (response.ok) {
-          const data = await response.json();
-          setCart(data);
+          const items = await response.json();
+          const total = items.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0);
+          setCart({ items, total });
         } else {
           const errorText = await response.text();
           console.error("Failed to fetch cart:", errorText);
@@ -42,16 +48,19 @@ export function useShoppingCart() {
         console.error("Cart fetch error:", error);
         toast.error("Failed to load your cart. Please check your connection.");
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
     loadCart();
   }, [session]);
 
-  // Save cart data
-  const saveCart = async (newCart: CartItem[]) => {
-    if (!session?.user) return;
+  // Add item to cart
+  const addItem = async (item: Omit<CartItem, "quantity"> & { quantity?: number }) => {
+    if (!session?.user) {
+      toast.error("Please sign in to add items to cart");
+      return;
+    }
 
     try {
       const response = await fetch("/api/cart", {
@@ -59,67 +68,81 @@ export function useShoppingCart() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ items: newCart }),
+        body: JSON.stringify({
+          productId: item.productId,
+          quantity: item.quantity || 1,
+        }),
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        const updatedCart = await response.json();
+        setCart({
+          items: updatedCart.items,
+          total: updatedCart.items.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0)
+        });
+        toast.success(`${item.name} added to cart`);
+      } else {
         const errorText = await response.text();
-        console.error("Failed to save cart:", errorText);
-        toast.error("Failed to update your cart. Please try again.");
-        return false;
+        console.error("Failed to add to cart:", errorText);
+        toast.error("Failed to add item to cart. Please try again.");
       }
-
-      return true;
     } catch (error) {
-      console.error("Cart save error:", error);
-      toast.error("Failed to update your cart. Please check your connection.");
-      return false;
-    }
-  };
-
-  // Add item to cart
-  const addItem = async (item: CartItem) => {
-    const existingItem = cart.find((i) => i.id === item.id);
-    let newCart: CartItem[];
-
-    if (existingItem) {
-      newCart = cart.map((i) =>
-        i.id === item.id
-          ? { ...i, quantity: i.quantity + (item.quantity || 1) }
-          : i
-      );
-    } else {
-      newCart = [...cart, { ...item, quantity: item.quantity || 1 }];
-    }
-
-    const success = await saveCart(newCart);
-    if (success) {
-      setCart(newCart);
-      toast.success(`${item.name} added to cart`);
-    }
-  };
-
-  // Remove item from cart
-  const removeItem = async (itemId: string) => {
-    const newCart = cart.filter((item) => item.id !== itemId);
-    const success = await saveCart(newCart);
-    if (success) {
-      setCart(newCart);
-      toast.success("Item removed from cart");
+      console.error("Add to cart error:", error);
+      toast.error("Failed to add item to cart. Please check your connection.");
     }
   };
 
   // Update item quantity
-  const updateQuantity = async (itemId: string, quantity: number) => {
+  const updateQuantity = async (productId: string, quantity: number) => {
+    if (!session?.user) return;
     if (quantity < 1) return;
 
-    const newCart = cart.map((item) =>
-      item.id === itemId ? { ...item, quantity } : item
-    );
+    try {
+      const response = await fetch(`/api/cart/${productId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ quantity }),
+      });
 
-    const success = await saveCart(newCart);
-    if (success) {
-      setCart(newCart);
+      if (response.ok) {
+        const { items } = await response.json();
+        const total = items.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0);
+        setCart({ items, total });
+    } else {
+        const errorText = await response.text();
+        console.error("Failed to update quantity:", errorText);
+        toast.error("Failed to update quantity. Please try again.");
+      }
+    } catch (error) {
+      console.error("Update quantity error:", error);
+      toast.error("Failed to update quantity. Please check your connection.");
+    }
+  };
+
+  // Remove item from cart
+  const removeItem = async (productId: string) => {
+    if (!session?.user) return;
+
+    try {
+      const response = await fetch(`/api/cart/${productId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        const newItems = cart.items.filter(item => item.productId !== productId);
+        const total = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        setCart({ items: newItems, total });
+      toast.success("Item removed from cart");
+      } else {
+        const errorText = await response.text();
+        console.error("Failed to remove item:", errorText);
+        toast.error("Failed to remove item. Please try again.");
+      }
+    } catch (error) {
+      console.error("Remove item error:", error);
+      toast.error("Failed to remove item. Please check your connection.");
     }
   };
 
@@ -133,7 +156,7 @@ export function useShoppingCart() {
       });
 
       if (response.ok) {
-        setCart([]);
+        setCart({ items: [], total: 0 });
         toast.success("Cart cleared");
       } else {
         const errorText = await response.text();
@@ -146,18 +169,12 @@ export function useShoppingCart() {
     }
   };
 
-  // Calculate totals
-  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
   return {
     cart,
-    isLoading,
+    loading,
     addItem,
     removeItem,
     updateQuantity,
     clearCart,
-    cartTotal,
-    itemCount,
   };
 } 

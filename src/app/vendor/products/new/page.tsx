@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,19 +16,91 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ImagePlus, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+
+interface Category {
+  _id: string;
+  name: string;
+  description?: string;
+}
 
 export default function AddProductPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [images, setImages] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    price: "",
+    comparePrice: "",
+    stock: "",
+    sku: "",
+    isPublished: false,
+    isFeatured: false,
+    trackInventory: true
+  });
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch("/api/categories");
+        if (response.ok) {
+          const data = await response.json();
+          setCategories(data);
+        } else {
+          toast.error("Failed to load categories");
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        toast.error("Failed to load categories");
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedCategory) {
+      toast.error("Please select a category");
+      return;
+    }
+
     setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
-    router.push("/vendor/products");
+    try {
+      const productData = {
+        ...formData,
+        categoryId: selectedCategory,
+        price: parseFloat(formData.price),
+        comparePrice: formData.comparePrice ? parseFloat(formData.comparePrice) : undefined,
+        stock: parseInt(formData.stock),
+        images
+      };
+
+      const response = await fetch("/api/vendor/products", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(productData),
+      });
+
+      if (response.ok) {
+        toast.success("Product created successfully");
+        router.push("/vendor/products");
+      } else {
+        const error = await response.json();
+        toast.error(error.message || "Failed to create product");
+      }
+    } catch (error) {
+      console.error("Error creating product:", error);
+      toast.error("Failed to create product");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,6 +111,17 @@ export default function AddProductPage() {
       );
       setImages((prev) => [...prev, ...newImages]);
     }
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { id, value } = e.target;
+    setFormData((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleSwitchChange = (id: string, checked: boolean) => {
+    setFormData((prev) => ({ ...prev, [id]: checked }));
   };
 
   return (
@@ -59,6 +142,8 @@ export default function AddProductPage() {
                 <Input
                   id="name"
                   placeholder="Enter product name"
+                  value={formData.name}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
@@ -67,21 +152,24 @@ export default function AddProductPage() {
                 <Textarea
                   id="description"
                   placeholder="Enter product description"
+                  value={formData.description}
+                  onChange={handleInputChange}
                   rows={4}
                   required
                 />
               </div>
               <div>
                 <Label htmlFor="category">Category</Label>
-                <Select>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="electronics">Electronics</SelectItem>
-                    <SelectItem value="clothing">Clothing</SelectItem>
-                    <SelectItem value="sports">Sports</SelectItem>
-                    <SelectItem value="home">Home & Garden</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category._id} value={category._id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -101,6 +189,8 @@ export default function AddProductPage() {
                     type="number"
                     step="0.01"
                     min="0"
+                    value={formData.price}
+                    onChange={handleInputChange}
                     className="pl-7"
                     placeholder="0.00"
                     required
@@ -116,6 +206,8 @@ export default function AddProductPage() {
                     type="number"
                     step="0.01"
                     min="0"
+                    value={formData.comparePrice}
+                    onChange={handleInputChange}
                     className="pl-7"
                     placeholder="0.00"
                   />
@@ -127,6 +219,8 @@ export default function AddProductPage() {
                   id="stock"
                   type="number"
                   min="0"
+                  value={formData.stock}
+                  onChange={handleInputChange}
                   placeholder="Enter stock quantity"
                   required
                 />
@@ -135,6 +229,8 @@ export default function AddProductPage() {
                 <Label htmlFor="sku">SKU</Label>
                 <Input
                   id="sku"
+                  value={formData.sku}
+                  onChange={handleInputChange}
                   placeholder="Enter SKU"
                 />
               </div>
@@ -200,7 +296,10 @@ export default function AddProductPage() {
                     Make this product visible to customers
                   </p>
                 </div>
-                <Switch />
+                <Switch
+                  checked={formData.isPublished}
+                  onCheckedChange={(checked) => handleSwitchChange("isPublished", checked)}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div>
@@ -209,7 +308,10 @@ export default function AddProductPage() {
                     Show this product in featured listings
                   </p>
                 </div>
-                <Switch />
+                <Switch
+                  checked={formData.isFeatured}
+                  onCheckedChange={(checked) => handleSwitchChange("isFeatured", checked)}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div>
@@ -218,7 +320,10 @@ export default function AddProductPage() {
                     Monitor stock levels for this product
                   </p>
                 </div>
-                <Switch defaultChecked />
+                <Switch
+                  checked={formData.trackInventory}
+                  onCheckedChange={(checked) => handleSwitchChange("trackInventory", checked)}
+                />
               </div>
             </div>
           </Card>
