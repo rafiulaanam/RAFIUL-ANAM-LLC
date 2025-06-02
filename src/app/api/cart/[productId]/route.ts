@@ -1,26 +1,37 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import clientPromise from "@/lib/db";
 import { authOptions } from "@/lib/auth";
 import { ObjectId } from "mongodb";
 
-interface Params {
-  params: {
-    productId: string;
-  };
-}
-
 // PUT /api/cart/[productId] - Update cart item quantity
-export async function PUT(request: Request, { params }: Params) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { productId: string } }
+) {
   try {
+    const productId = params?.productId;
+    if (!productId) {
+      return NextResponse.json(
+        { error: "Product ID is required" },
+        { status: 400 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     const { quantity } = await request.json();
     if (quantity < 0) {
-      return new NextResponse("Invalid quantity", { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid quantity" },
+        { status: 400 }
+      );
     }
 
     const client = await clientPromise;
@@ -28,24 +39,30 @@ export async function PUT(request: Request, { params }: Params) {
 
     // Verify product exists and is available
     const product = await db.collection("products").findOne({
-      _id: new ObjectId(params.productId),
+      _id: new ObjectId(productId),
       deletedAt: { $exists: false }
     });
 
     if (!product) {
-      return new NextResponse("Product not found", { status: 404 });
+      return NextResponse.json(
+        { error: "Product not found" },
+        { status: 404 }
+      );
     }
 
     // Check stock availability
     if (product.stock !== undefined && quantity > product.stock) {
-      return new NextResponse("Not enough stock available", { status: 400 });
+      return NextResponse.json(
+        { error: "Not enough stock available" },
+        { status: 400 }
+      );
     }
 
     if (quantity === 0) {
       // Remove item if quantity is 0
       await db.collection("carts").updateOne(
         { userId: session.user.id },
-        { $unset: { [`items.${params.productId}`]: "" } }
+        { $unset: { [`items.${productId}`]: "" } }
       );
     } else {
       // Update quantity
@@ -53,7 +70,7 @@ export async function PUT(request: Request, { params }: Params) {
         { userId: session.user.id },
         {
           $set: {
-            [`items.${params.productId}`]: {
+            [`items.${productId}`]: {
               quantity,
               updatedAt: new Date()
             }
@@ -89,16 +106,33 @@ export async function PUT(request: Request, { params }: Params) {
     return NextResponse.json({ items: cartItems });
   } catch (error) {
     console.error("Error updating cart item:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update cart item" },
+      { status: 500 }
+    );
   }
 }
 
 // DELETE /api/cart/[productId] - Remove item from cart
-export async function DELETE(_: Request, { params }: Params) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { productId: string } }
+) {
   try {
+    const productId = params?.productId;
+    if (!productId) {
+      return NextResponse.json(
+        { error: "Product ID is required" },
+        { status: 400 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     const client = await clientPromise;
@@ -106,10 +140,13 @@ export async function DELETE(_: Request, { params }: Params) {
 
     // Get current cart to check quantity
     const cart = await db.collection("carts").findOne({ userId: session.user.id });
-    const currentItem = cart?.items?.[params.productId];
+    const currentItem = cart?.items?.[productId];
 
     if (!currentItem) {
-      return new NextResponse("Item not found in cart", { status: 404 });
+      return NextResponse.json(
+        { error: "Item not found in cart" },
+        { status: 404 }
+      );
     }
 
     // If quantity > 1, decrease by 1. Otherwise, remove the item
@@ -118,15 +155,15 @@ export async function DELETE(_: Request, { params }: Params) {
         { userId: session.user.id },
         {
           $set: {
-            [`items.${params.productId}.quantity`]: currentItem.quantity - 1,
-            [`items.${params.productId}.updatedAt`]: new Date()
+            [`items.${productId}.quantity`]: currentItem.quantity - 1,
+            [`items.${productId}.updatedAt`]: new Date()
           }
         }
       );
     } else {
       await db.collection("carts").updateOne(
         { userId: session.user.id },
-        { $unset: { [`items.${params.productId}`]: "" } }
+        { $unset: { [`items.${productId}`]: "" } }
       );
     }
 
@@ -156,6 +193,9 @@ export async function DELETE(_: Request, { params }: Params) {
     return NextResponse.json({ items: cartItems });
   } catch (error) {
     console.error("Error removing cart item:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to remove cart item" },
+      { status: 500 }
+    );
   }
 } 

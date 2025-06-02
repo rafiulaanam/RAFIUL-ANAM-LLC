@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -40,13 +40,15 @@ export default function ProductCard({ product, showAddToCart = true }: ProductCa
   
   const { toast } = useToast();
   const [isAdding, setIsAdding] = useState(false);
+  const [localQuantity, setLocalQuantity] = useState(0);
 
   const handleAddToCart = async () => {
     try {
       setIsAdding(true);
       await addToCart(product, 1);
+      setLocalQuantity(1); // Set local quantity immediately
       toast({
-        title: "Added to cart",
+        title: "✔ Added to Cart",
         description: `${product.name} has been added to your cart.`,
       });
     } catch (error) {
@@ -67,8 +69,10 @@ export default function ProductCard({ product, showAddToCart = true }: ProductCa
     if (newQuantity < 1) return;
     
     try {
+      setLocalQuantity(newQuantity); // Update local quantity immediately
       await updateCartQuantity(product._id, newQuantity);
     } catch (error) {
+      setLocalQuantity(quantity); // Reset to server quantity on error
       toast({
         title: "Error",
         description: "Failed to update quantity",
@@ -78,6 +82,11 @@ export default function ProductCard({ product, showAddToCart = true }: ProductCa
   };
 
   const quantity = getCartItemQuantity(product._id);
+
+  // Update local quantity when server quantity changes
+  useEffect(() => {
+    setLocalQuantity(quantity);
+  }, [quantity]);
 
   return (
     <div className="group bg-white dark:bg-gray-800 rounded-xl overflow-hidden border dark:border-gray-700">
@@ -129,55 +138,61 @@ export default function ProductCard({ product, showAddToCart = true }: ProductCa
           {showAddToCart && (
             <div className="flex items-center gap-2">
               {isInCart(product._id) ? (
-                <div className="flex items-center border rounded-lg">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleUpdateQuantity(quantity - 1);
-                    }}
-                    disabled={quantity <= 1 || state.isLoading}
-                  >
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                  <span className="w-8 text-center text-sm">{quantity}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleUpdateQuantity(quantity + 1);
-                    }}
-                    disabled={state.isLoading}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center border rounded-lg">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleUpdateQuantity(localQuantity - 1);
+                      }}
+                      disabled={localQuantity <= 1 || state.isLoading}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <span className="w-8 text-center text-sm">{localQuantity}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleUpdateQuantity(localQuantity + 1);
+                      }}
+                      disabled={state.isLoading}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <span className="text-sm text-muted-foreground">in cart</span>
                 </div>
               ) : (
-                <Button
-                  size="sm"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleAddToCart();
-                  }}
-                  disabled={isAdding || state.isLoading}
-                  className="relative"
-                >
-                  {isAdding ? (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      Added
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Add to Cart
-                    </>
-                  )}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleAddToCart();
+                    }}
+                    disabled={isAdding || state.isLoading}
+                    className="relative"
+                  >
+                    {isAdding ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        Added
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Add to Cart
+                      </>
+                    )}
+                  </Button>
+                  {isAdding && <span className="text-sm text-muted-foreground">Qty: 1</span>}
+                </div>
               )}
             </div>
           )}

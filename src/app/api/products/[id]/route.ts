@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import clientPromise from '@/lib/db';
@@ -6,28 +6,33 @@ import Product from '@/models/product';
 import { ProductResponse } from '@/types/types';
 import { ObjectId } from "mongodb";
 
-interface Params {
-  params: {
-    id: string;
-  };
-}
-
 // GET single product
-export async function GET(request: Request, { params }: Params) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
+    const id = params?.id;
+    if (!id) {
+      return NextResponse.json(
+        { error: "Product ID is required" },
+        { status: 400 }
+      );
+    }
+
     const client = await clientPromise;
     const db = client.db();
 
     // Convert string ID to ObjectId
     let productId;
     try {
-      if (!ObjectId.isValid(params.id)) {
+      if (!ObjectId.isValid(id)) {
         return NextResponse.json(
           { error: "Invalid product ID format" },
           { status: 400 }
         );
       }
-      productId = new ObjectId(params.id);
+      productId = new ObjectId(id);
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid product ID format" },
@@ -142,8 +147,19 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 // PATCH update product
-export async function PATCH(request: Request, { params }: Params) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
+    const id = params?.id;
+    if (!id) {
+      return NextResponse.json(
+        { error: "Product ID is required" },
+        { status: 400 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -174,7 +190,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
     // Check if product exists and belongs to vendor
     const existingProduct = await db.collection("products").findOne({
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(id),
       vendorId: vendor._id,
       deletedAt: { $exists: false }
     });
@@ -208,12 +224,12 @@ export async function PATCH(request: Request, { params }: Params) {
     };
 
     await db.collection("products").updateOne(
-      { _id: new ObjectId(params.id) },
+      { _id: new ObjectId(id) },
       { $set: updateData }
     );
 
     const updatedProduct = await db.collection("products").findOne({
-      _id: new ObjectId(params.id)
+      _id: new ObjectId(id)
     });
     
     return NextResponse.json({
@@ -232,8 +248,19 @@ export async function PATCH(request: Request, { params }: Params) {
 }
 
 // DELETE product (soft delete)
-export async function DELETE(request: Request, { params }: Params) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
+    const id = params?.id;
+    if (!id) {
+      return NextResponse.json(
+        { error: "Product ID is required" },
+        { status: 400 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -263,13 +290,13 @@ export async function DELETE(request: Request, { params }: Params) {
     }
 
     // Check if product exists and belongs to vendor
-    const product = await db.collection("products").findOne({
-      _id: new ObjectId(params.id),
+    const existingProduct = await db.collection("products").findOne({
+      _id: new ObjectId(id),
       vendorId: vendor._id,
       deletedAt: { $exists: false }
     });
-    
-    if (!product) {
+
+    if (!existingProduct) {
       return NextResponse.json(
         { error: "Product not found" },
         { status: 404 }
@@ -278,7 +305,7 @@ export async function DELETE(request: Request, { params }: Params) {
 
     // Soft delete the product
     await db.collection("products").updateOne(
-      { _id: new ObjectId(params.id) },
+      { _id: new ObjectId(id) },
       { 
         $set: { 
           deletedAt: new Date(),

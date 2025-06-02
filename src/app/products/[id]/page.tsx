@@ -30,6 +30,7 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [localQuantity, setLocalQuantity] = useState(0);
   
   const {
     isInWishlist,
@@ -43,6 +44,11 @@ export default function ProductPage() {
   const cartItem = product ? cart?.items?.find(item => item.productId === product._id) : null;
   const quantity = cartItem?.quantity || 0;
   const isInCart = Boolean(cartItem);
+
+  // Update local quantity when server quantity changes
+  useEffect(() => {
+    setLocalQuantity(quantity);
+  }, [quantity]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -79,6 +85,7 @@ export default function ProductPage() {
     
     try {
       setIsAdding(true);
+      setLocalQuantity(1); // Set local quantity immediately
       await addItem({
         productId: product._id,
         name: product.name,
@@ -87,11 +94,12 @@ export default function ProductPage() {
         quantity: 1
       });
       toast({
-        title: "Added to cart",
+        title: "✔ Added to Cart",
         description: `${product.name} has been added to your cart.`,
       });
     } catch (error) {
       console.error("Error adding to cart:", error);
+      setLocalQuantity(0); // Reset on error
       toast({
         title: "Error",
         description: "Failed to add item to cart",
@@ -109,9 +117,11 @@ export default function ProductPage() {
     if (!product || newQuantity < 1) return;
     
     try {
+      setLocalQuantity(newQuantity); // Update local quantity immediately
       await updateQuantity(product._id, newQuantity);
     } catch (error) {
       console.error("Error updating quantity:", error);
+      setLocalQuantity(quantity); // Reset to server quantity on error
       toast({
         title: "Error",
         description: "Failed to update quantity",
@@ -137,106 +147,106 @@ export default function ProductPage() {
   }
 
   return (
-    <div className="min-h-screen py-12 bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {/* Product Images */}
-          <div className="space-y-4">
-            {/* Main Image */}
-            <div className="relative h-[500px] rounded-xl overflow-hidden bg-white">
-              <Image
-                src={product.images[selectedImage]}
-                alt={product.name}
-                fill
-                className="object-contain"
-                priority
-              />
+    <div className="container max-w-7xl mx-auto px-4 py-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Product Images */}
+        <div className="space-y-4">
+          <div className="relative aspect-square overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+            <Image
+              src={product.images[selectedImage]}
+              alt={product.name}
+              fill
+              className="object-cover"
+              priority
+            />
+          </div>
+          {product.images.length > 1 && (
+            <div className="grid grid-cols-4 gap-4">
+              {product.images.map((image, index) => (
+                <button
+                  key={index}
+                  onClick={() => setSelectedImage(index)}
+                  className={`relative aspect-square overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800 ${
+                    selectedImage === index
+                      ? "ring-2 ring-primary"
+                      : "hover:ring-2 hover:ring-primary/50"
+                  }`}
+                >
+                  <Image
+                    src={image}
+                    alt={`${product.name} - Image ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                </button>
+              ))}
             </div>
-            
-            {/* Thumbnails */}
-            {product.images.length > 1 && (
-              <div className="grid grid-cols-5 gap-2">
-                {product.images.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedImage(index)}
-                    className={`relative h-20 rounded-lg overflow-hidden border-2 transition-all bg-white ${
-                      selectedImage === index
-                        ? 'border-primary ring-2 ring-primary ring-opacity-50'
-                        : 'border-transparent hover:border-gray-300'
-                    }`}
-                  >
-                    <Image
-                      src={image}
-                      alt={`${product.name} thumbnail ${index + 1}`}
-                      fill
-                      className="object-contain p-1"
-                    />
-                  </button>
-                ))}
+          )}
+        </div>
+
+        {/* Product Details */}
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1">
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                <span className="font-medium">{product.rating}</span>
+                <span className="text-muted-foreground">
+                  ({product.reviews} reviews)
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={isInWishlist(product._id) ? "text-red-500" : ""}
+                onClick={() => toggleWishlist(product._id)}
+              >
+                <Heart className="h-5 w-5" fill={isInWishlist(product._id) ? "currentColor" : "none"} />
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-2xl font-bold">${product.price}</div>
+            {product.category && (
+              <div className="text-sm text-muted-foreground">
+                Category: <span className="capitalize">{product.category.name}</span>
+              </div>
+            )}
+            {product.brand && (
+              <div className="text-sm text-muted-foreground">
+                Brand: <span className="capitalize">{product.brand}</span>
               </div>
             )}
           </div>
 
-          {/* Product Details */}
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+          <div className="flex items-center gap-4">
+            {isInCart ? (
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1">
-                  <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-medium">{product.rating}</span>
-                  <span className="text-muted-foreground">
-                    ({product.reviews} reviews)
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={isInWishlist(product._id) ? "text-red-500" : ""}
-                  onClick={() => toggleWishlist(product._id)}
-                >
-                  <Heart className="h-5 w-5" fill={isInWishlist(product._id) ? "currentColor" : "none"} />
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-2xl font-bold">${product.price}</div>
-              {product.category && (
-                <div className="text-sm text-muted-foreground">
-                  Category: <span className="capitalize">{product.category.name}</span>
-                </div>
-              )}
-              {product.brand && (
-                <div className="text-sm text-muted-foreground">
-                  Brand: <span className="capitalize">{product.brand}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4">
-              {isInCart ? (
                 <div className="flex items-center border rounded-lg">
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleUpdateQuantity(quantity - 1)}
-                    disabled={quantity <= 1 || cartLoading}
+                    onClick={() => handleUpdateQuantity(localQuantity - 1)}
+                    disabled={localQuantity <= 1 || cartLoading}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
-                  <span className="w-12 text-center">{quantity}</span>
+                  <span className="w-12 text-center">{localQuantity}</span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleUpdateQuantity(quantity + 1)}
+                    onClick={() => handleUpdateQuantity(localQuantity + 1)}
                     disabled={cartLoading}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-              ) : (
+                <span className="text-sm text-muted-foreground">in cart</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-4 flex-1">
                 <Button
                   className="flex-1"
                   onClick={handleAddToCart}
@@ -254,20 +264,21 @@ export default function ProductPage() {
                     </>
                   )}
                 </Button>
-              )}
-            </div>
+                {isAdding && <span className="text-sm text-muted-foreground">Qty: 1</span>}
+              </div>
+            )}
+          </div>
 
-            <div className="prose dark:prose-invert max-w-none">
-              <h3>Product Description</h3>
-              <p>{product.description}</p>
-              <h3>Features</h3>
-              <ul>
-                <li>High-quality materials</li>
-                <li>Durable construction</li>
-                <li>Premium finish</li>
-                <li>Satisfaction guaranteed</li>
-              </ul>
-            </div>
+          <div className="prose dark:prose-invert max-w-none">
+            <h3>Product Description</h3>
+            <p>{product.description}</p>
+            <h3>Features</h3>
+            <ul>
+              <li>High-quality materials</li>
+              <li>Durable construction</li>
+              <li>Premium finish</li>
+              <li>Satisfaction guaranteed</li>
+            </ul>
           </div>
         </div>
       </div>

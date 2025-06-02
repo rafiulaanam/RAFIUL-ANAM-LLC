@@ -64,8 +64,9 @@ export const useCartStore = create<CartStore>((set, get) => ({
       // Try to fetch from API first (for logged-in users)
       const response = await fetch('/api/cart');
       
+      const data = await response.json();
+      
       if (response.ok) {
-        const data = await response.json();
         const items = data.items || [];
         set({ 
           cart: {
@@ -86,6 +87,11 @@ export const useCartStore = create<CartStore>((set, get) => ({
           initialized: true,
           loading: false 
         });
+        
+        // Show error message if it's not just an unauthorized error
+        if (response.status !== 401) {
+          toast.error(data.error || "Failed to load your cart");
+        }
       }
     } catch (error) {
       console.error('Error loading cart:', error);
@@ -99,6 +105,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
         initialized: true,
         loading: false 
       });
+      toast.error("Failed to load your cart. Please try again.");
     }
   },
 
@@ -165,9 +172,54 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
   updateQuantity: async (productId: string, quantity: number) => {
     try {
+      // If quantity is 0 or less, remove the item
+      if (quantity <= 0) {
+        // Update the UI immediately for smoother transition
+        const currentItems = get().cart.items;
+        const itemToRemove = currentItems.find(item => item.productId === productId);
+        
+        if (itemToRemove) {
+          // Update local state first for immediate feedback
+          set(state => ({ 
+            cart: {
+              items: currentItems.map(item => 
+                item.productId === productId 
+                  ? { ...item, quantity: 0 }
+                  : item
+              ),
+              total: calculateTotal(currentItems.filter(item => item.productId !== productId))
+            }
+          }));
+        }
+        
+        await get().removeItem(productId);
+        return;
+      }
+
       // Set loading state for this item
       set(state => ({
         loadingItems: new Set(state.loadingItems).add(productId)
+      }));
+
+      // Get current item to show proper toast message
+      const currentItems = get().cart.items;
+      const currentItem = currentItems.find(item => item.productId === productId);
+      const isIncrease = currentItem && quantity > currentItem.quantity;
+
+      // Update local state immediately for smooth UI
+      set(state => ({ 
+        cart: {
+          items: currentItems.map(item =>
+            item.productId === productId
+              ? { ...item, quantity }
+              : item
+          ),
+          total: calculateTotal(currentItems.map(item =>
+            item.productId === productId
+              ? { ...item, quantity }
+              : item
+          ))
+        }
       }));
 
       // Try API first
@@ -187,17 +239,16 @@ export const useCartStore = create<CartStore>((set, get) => ({
           },
           loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
         }));
-        toast.success('Cart updated');
+        if (quantity !== 0) { // Don't show toast for intermediate steps
+          toast.success(isIncrease ? 'Quantity increased' : 'Quantity decreased');
+        }
       } else {
         // Fallback to localStorage
-        const currentItems = get().cart.items;
-        const updatedItems = quantity === 0
-          ? currentItems.filter(item => item.productId !== productId)
-          : currentItems.map(item =>
-              item.productId === productId
-                ? { ...item, quantity }
-                : item
-            );
+        const updatedItems = currentItems.map(item =>
+          item.productId === productId
+            ? { ...item, quantity }
+            : item
+        );
         
         set(state => ({ 
           cart: {
@@ -207,14 +258,16 @@ export const useCartStore = create<CartStore>((set, get) => ({
           loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
         }));
         syncWithLocalStorage(updatedItems);
-        toast.success('Cart updated');
+        if (quantity !== 0) { // Don't show toast for intermediate steps
+          toast.success(isIncrease ? 'Quantity increased' : 'Quantity decreased');
+        }
       }
     } catch (error) {
       console.error('Error updating cart:', error);
       set(state => ({
         loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
       }));
-      toast.error('Failed to update cart');
+      toast.error('Failed to update quantity');
     }
   },
 
@@ -224,6 +277,20 @@ export const useCartStore = create<CartStore>((set, get) => ({
       set(state => ({
         loadingItems: new Set(state.loadingItems).add(productId)
       }));
+
+      // Get item name for toast message and update UI immediately
+      const currentItems = get().cart.items;
+      const itemToRemove = currentItems.find(item => item.productId === productId);
+      
+      // Update UI immediately for better responsiveness
+      if (itemToRemove) {
+        set(state => ({ 
+          cart: {
+            items: currentItems.filter(item => item.productId !== productId),
+            total: calculateTotal(currentItems.filter(item => item.productId !== productId))
+          }
+        }));
+      }
 
       // Try API first
       const response = await fetch(`/api/cart/${productId}`, {
@@ -240,10 +307,9 @@ export const useCartStore = create<CartStore>((set, get) => ({
           },
           loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
         }));
-        toast.success('Item removed from cart');
+        toast.success(itemToRemove ? `Removed ${itemToRemove.name}` : 'Item removed from cart');
       } else {
         // Fallback to localStorage
-        const currentItems = get().cart.items;
         const updatedItems = currentItems.filter(item => item.productId !== productId);
         set(state => ({ 
           cart: {
@@ -253,7 +319,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
           loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
         }));
         syncWithLocalStorage(updatedItems);
-        toast.success('Item removed from cart');
+        toast.success(itemToRemove ? `Removed ${itemToRemove.name}` : 'Item removed from cart');
       }
     } catch (error) {
       console.error('Error removing item:', error);

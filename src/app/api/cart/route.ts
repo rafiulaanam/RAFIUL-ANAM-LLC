@@ -122,7 +122,10 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     const client = await clientPromise;
@@ -134,9 +137,23 @@ export async function GET() {
 
     // Get product details for cart items
     const productIds = Object.keys(items);
-    const products = productIds.length > 0
+    
+    // Filter out invalid ObjectIds and convert valid ones
+    const validObjectIds = productIds.reduce<ObjectId[]>((acc, id) => {
+      try {
+        if (ObjectId.isValid(id)) {
+          acc.push(new ObjectId(id));
+        }
+      } catch (error) {
+        console.error(`Invalid ObjectId: ${id}`);
+      }
+      return acc;
+    }, []);
+
+    // Get products with valid IDs
+    const products = validObjectIds.length > 0
       ? await db.collection("products").find({ 
-          _id: { $in: productIds.map(id => new ObjectId(id)) },
+          _id: { $in: validObjectIds },
           deletedAt: { $exists: false }
         }).toArray()
       : [];
@@ -154,7 +171,10 @@ export async function GET() {
     return NextResponse.json({ items: cartItems });
   } catch (error) {
     console.error("Error fetching cart:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to load your cart. Please try again." },
+      { status: 500 }
+    );
   }
 }
 

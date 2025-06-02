@@ -14,9 +14,10 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Star, ShoppingCart, Eye } from "lucide-react";
+import { Loader2, Search, Star, ShoppingCart, Eye, Check, Plus, Minus } from "lucide-react";
 import { toast } from "sonner";
 import { useInView } from "react-intersection-observer";
+import { useCartStore } from "@/store/useCartStore";
 
 interface Product {
   _id: string;
@@ -65,7 +66,12 @@ export default function ShopPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const { ref, inView } = useInView();
+  const [addingToCart, setAddingToCart] = useState<{ [key: string]: boolean }>({});
+  const [localQuantities, setLocalQuantities] = useState<{ [key: string]: number }>({});
+
+  const { cart, addItem, updateQuantity, loading: cartLoading } = useCartStore();
 
   const [filters, setFilters] = useState<FilterState>({
     search: searchParams.get("search") || "",
@@ -187,6 +193,64 @@ export default function ShopPage() {
       />
     ));
   };
+
+  // Get cart item details for each product
+  const getCartDetails = (productId: string) => {
+    const cartItem = cart?.items?.find(item => item.productId === productId);
+    return {
+      quantity: cartItem?.quantity || 0,
+      isInCart: Boolean(cartItem)
+    };
+  };
+
+  const handleAddToCart = async (product: Product) => {
+    try {
+      setAddingToCart(prev => ({ ...prev, [product._id]: true }));
+      setLocalQuantities(prev => ({ ...prev, [product._id]: 1 }));
+      
+      await addItem({
+        productId: product._id,
+        name: product.name,
+        price: product.price,
+        image: product.images[0],
+        quantity: 1
+      });
+      
+      toast.success("✔ Added to Cart");
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      setLocalQuantities(prev => ({ ...prev, [product._id]: 0 }));
+      toast.error("Failed to add item to cart");
+    } finally {
+      // Reset after 2 seconds
+      setTimeout(() => {
+        setAddingToCart(prev => ({ ...prev, [product._id]: false }));
+      }, 2000);
+    }
+  };
+
+  const handleUpdateQuantity = async (productId: string, newQuantity: number) => {
+    if (newQuantity < 1) return;
+    
+    try {
+      setLocalQuantities(prev => ({ ...prev, [productId]: newQuantity }));
+      await updateQuantity(productId, newQuantity);
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      const { quantity } = getCartDetails(productId);
+      setLocalQuantities(prev => ({ ...prev, [productId]: quantity }));
+      toast.error("Failed to update quantity");
+    }
+  };
+
+  // Update local quantities when cart changes
+  useEffect(() => {
+    const newQuantities: { [key: string]: number } = {};
+    cart?.items?.forEach(item => {
+      newQuantities[item.productId] = item.quantity;
+    });
+    setLocalQuantities(newQuantities);
+  }, [cart?.items]);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -364,10 +428,64 @@ export default function ShopPage() {
                         <Eye className="mr-2 h-4 w-4" />
                         View
                       </Button>
-                      <Button className="flex-1">
-                        <ShoppingCart className="mr-2 h-4 w-4" />
-                        Add
-                      </Button>
+                      {getCartDetails(product._id).isInCart ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center border rounded-lg">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleUpdateQuantity(
+                                product._id,
+                                localQuantities[product._id] - 1
+                              )}
+                              disabled={localQuantities[product._id] <= 1 || cartLoading}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-8 text-center text-sm">
+                              {localQuantities[product._id]}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleUpdateQuantity(
+                                product._id,
+                                localQuantities[product._id] + 1
+                              )}
+                              disabled={cartLoading}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            className="flex-1"
+                            onClick={() => handleAddToCart(product)}
+                            disabled={addingToCart[product._id] || cartLoading}
+                          >
+                            {addingToCart[product._id] ? (
+                              <>
+                                <Check className="mr-2 h-4 w-4" />
+                                Added
+                              </>
+                            ) : (
+                              <>
+                                <ShoppingCart className="mr-2 h-4 w-4" />
+                                Add
+                              </>
+                            )}
+                          </Button>
+                          {addingToCart[product._id] && (
+                            <span className="text-sm text-muted-foreground">
+                              Qty: 1
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -378,9 +496,11 @@ export default function ShopPage() {
             {hasMore && (
               <div
                 ref={ref}
-                className="mt-8 flex items-center justify-center"
+                className="flex justify-center py-8"
               >
-                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                {isLoadingMore && (
+                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                )}
               </div>
             )}
 
