@@ -15,39 +15,84 @@ interface Params {
 // GET single product
 export async function GET(request: Request, { params }: Params) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
     const client = await clientPromise;
     const db = client.db();
 
-    // Get vendor details
-    const vendor = await db.collection("users").findOne({
-      email: session.user.email,
-      $or: [
-        { role: "VENDOR" },
-        { role: "vendor" },
-        { role: "Vendor" }
-      ]
-    });
-
-    if (!vendor) {
+    // Convert string ID to ObjectId
+    let productId;
+    try {
+      if (!ObjectId.isValid(params.id)) {
+        return NextResponse.json(
+          { error: "Invalid product ID format" },
+          { status: 400 }
+        );
+      }
+      productId = new ObjectId(params.id);
+    } catch (error) {
       return NextResponse.json(
-        { error: "Vendor not found" },
-        { status: 404 }
+        { error: "Invalid product ID format" },
+        { status: 400 }
       );
     }
 
-    const product = await db.collection("products").findOne({
-      _id: new ObjectId(params.id),
-      vendorId: vendor._id,
-      deletedAt: { $exists: false }
-    });
+    // Get product with vendor and category information
+    const [product] = await db
+      .collection("products")
+      .aggregate([
+        {
+          $match: {
+            _id: productId,
+            deletedAt: { $exists: false }
+          }
+        },
+        {
+          $lookup: {
+            from: "users",
+            let: { vendorId: "$vendorId" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ["$_id", "$$vendorId"] }
+                }
+              },
+              {
+                $project: {
+                  name: 1,
+                  _id: 1
+                }
+              }
+            ],
+            as: "vendor"
+          }
+        },
+        {
+          $lookup: {
+            from: "categories",
+            let: { categoryId: "$categoryId" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ["$_id", "$$categoryId"] }
+                }
+              },
+              {
+                $project: {
+                  name: 1,
+                  _id: 1
+                }
+              }
+            ],
+            as: "category"
+          }
+        },
+        {
+          $addFields: {
+            vendor: { $arrayElemAt: ["$vendor", 0] },
+            category: { $arrayElemAt: ["$category", 0] }
+          }
+        }
+      ])
+      .toArray();
 
     if (!product) {
       return NextResponse.json(
@@ -56,12 +101,28 @@ export async function GET(request: Request, { params }: Params) {
       );
     }
 
-    return NextResponse.json({
+    // Transform ObjectIds to strings
+    const transformedProduct = {
       ...product,
       _id: product._id.toString(),
-      vendorId: product.vendorId.toString(),
-      categoryId: product.categoryId ? product.categoryId.toString() : null
-    });
+      vendorId: product.vendorId ? product.vendorId.toString() : null,
+      categoryId: product.categoryId ? product.categoryId.toString() : null,
+      images: Array.isArray(product.images) 
+        ? product.images 
+        : product.image 
+          ? [product.image]
+          : ['/placeholder-image.jpg'],
+      vendor: product.vendor ? {
+        ...product.vendor,
+        _id: product.vendor._id.toString()
+      } : null,
+      category: product.category ? {
+        ...product.category,
+        _id: product.category._id.toString()
+      } : null
+    };
+
+    return NextResponse.json(transformedProduct);
   } catch (error) {
     console.error("Error fetching product:", error);
     return NextResponse.json(

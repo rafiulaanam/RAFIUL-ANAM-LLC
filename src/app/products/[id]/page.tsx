@@ -12,7 +12,7 @@ interface Product {
   _id: string;
   name: string;
   price: number;
-  image: string;
+  images: string[];
   category: string;
   brand: string;
   rating: number;
@@ -26,6 +26,7 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(0);
   
   const {
     isInWishlist,
@@ -39,14 +40,17 @@ export default function ProductPage() {
     const fetchProduct = async () => {
       try {
         const response = await fetch(`/api/products/${params.id}`);
-        if (!response.ok) throw new Error("Failed to fetch product");
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to fetch product");
+        }
         const data = await response.json();
-        setProduct(data.data);
+        setProduct(data);
       } catch (error) {
         console.error("Error fetching product:", error);
         toast({
           title: "Error",
-          description: "Failed to load product",
+          description: error instanceof Error ? error.message : "Failed to load product",
           variant: "destructive",
         });
       } finally {
@@ -55,7 +59,7 @@ export default function ProductPage() {
     };
 
     fetchProduct();
-  }, [params.id]);
+  }, [params.id, toast]);
 
   if (loading) {
     return (
@@ -96,14 +100,42 @@ export default function ProductPage() {
     <div className="min-h-screen py-12 bg-gray-50 dark:bg-gray-900">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {/* Product Image */}
-          <div className="relative h-[500px] rounded-xl overflow-hidden">
-            <Image
-              src={product.image}
-              alt={product.name}
-              fill
-              className="object-cover"
-            />
+          {/* Product Images */}
+          <div className="space-y-4">
+            {/* Main Image */}
+            <div className="relative h-[500px] rounded-xl overflow-hidden">
+              <Image
+                src={product?.images?.[selectedImage] || '/placeholder-image.jpg'}
+                alt={product?.name || 'Product image'}
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+            
+            {/* Thumbnails */}
+            {product?.images && product.images.length > 1 && (
+              <div className="grid grid-cols-5 gap-2 mt-4">
+                {product.images.map((image, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedImage(index)}
+                    className={`relative h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                      selectedImage === index
+                        ? 'border-primary'
+                        : 'border-transparent hover:border-gray-300'
+                    }`}
+                  >
+                    <Image
+                      src={image}
+                      alt={`${product.name} thumbnail ${index + 1}`}
+                      fill
+                      className="object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product Details */}

@@ -5,10 +5,15 @@ import { useSession } from "next-auth/react";
 
 // Define types
 export type Product = {
-  id: string;
+  _id: string;
   name: string;
   price: number;
-  // Add other product properties as needed
+  image: string;
+  description: string;
+  category: string;
+  brand: string;
+  rating: number;
+  reviews: number;
 };
 
 type ShopState = {
@@ -38,6 +43,7 @@ type ShopContextType = {
   removeFromWishlist: (productId: string) => void;
   clearCart: () => void;
   clearWishlist: () => void;
+  isInWishlist: (productId: string) => boolean;
 };
 
 // Create context
@@ -62,7 +68,7 @@ function shopReducer(state: ShopState, action: ShopAction): ShopState {
     case "REMOVE_FROM_CART":
       return {
         ...state,
-        cart: state.cart.filter((item) => item.id !== action.payload),
+        cart: state.cart.filter((item) => item._id !== action.payload),
       };
     case "ADD_TO_WISHLIST":
       return {
@@ -72,7 +78,7 @@ function shopReducer(state: ShopState, action: ShopAction): ShopState {
     case "REMOVE_FROM_WISHLIST":
       return {
         ...state,
-        wishlist: state.wishlist.filter((item) => item.id !== action.payload),
+        wishlist: state.wishlist.filter((item) => item._id !== action.payload),
       };
     case "SET_LOADING":
       return {
@@ -172,6 +178,9 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     },
     clearWishlist: () => {
       dispatch({ type: "CLEAR_WISHLIST" });
+    },
+    isInWishlist: (productId) => {
+      return state.wishlist.some((item) => item._id === productId);
     },
   };
 
