@@ -3,8 +3,18 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/db";
 import { ObjectId } from "mongodb";
-import Product from '@/models/product';
 import { ProductQueryParams, PaginatedResponse, IProduct } from '@/types/types';
+import type { Session } from "next-auth";
+
+interface CustomSession extends Session {
+  user: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+    role: string;
+  }
+}
 
 // GET products with filtering, sorting, and pagination
 export async function GET(request: Request) {
@@ -68,30 +78,36 @@ export async function GET(request: Request) {
 // POST new product
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as CustomSession | null;
 
-    if (!session || session.user.role !== "ADMIN") {
+    if (!session?.user?.role || !["ADMIN", "VENDOR"].includes(session.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const data = await request.json();
     console.log('Received product data:', data);
     
-    // Prepare the product data
-    const productData = {
-      ...data,
-      // Convert single image to images array
-      images: [data.image],
-      // Remove the single image field
-      image: undefined,
-      // Set category with proper ObjectId
-      category: new ObjectId(data.category),
-      // Set vendor as the admin user for now
-      vendor: new ObjectId(session.user.id),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      createdBy: session.user.id
-    };
+    // Validate required fields
+    const requiredFields = ['name', 'description', 'price', 'categoryId', 'brand', 'stock'];
+    const missingFields = requiredFields.filter(field => !data[field]);
+    if (missingFields.length > 0) {
+      return NextResponse.json({
+        error: `Missing required fields: ${missingFields.join(', ')}`
+      }, { status: 400 });
+    }
+
+    // Validate numeric fields
+    if (isNaN(data.price) || data.price < 0) {
+      return NextResponse.json({
+        error: "Price must be a valid positive number"
+      }, { status: 400 });
+    }
+
+    if (isNaN(data.stock) || data.stock < 0) {
+      return NextResponse.json({
+        error: "Stock must be a valid positive number"
+      }, { status: 400 });
+    }
 
     const client = await clientPromise;
     const db = client.db();
@@ -99,7 +115,7 @@ export async function POST(request: Request) {
     // Validate that the category exists
     const categoryExists = await db
       .collection("categories")
-      .findOne({ _id: new ObjectId(data.category) });
+      .findOne({ _id: new ObjectId(data.categoryId) });
 
     if (!categoryExists) {
       return NextResponse.json(
@@ -107,6 +123,50 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // If vendor, validate that the vendor exists
+    if (session.user.role === "VENDOR") {
+      const vendorExists = await db
+        .collection("users")
+        .findOne({ 
+          _id: new ObjectId(session.user.id),
+          role: "VENDOR"
+        });
+
+      if (!vendorExists) {
+        return NextResponse.json(
+          { error: "Vendor account not found" },
+          { status: 400 }
+        );
+      }
+    }
+    
+    // Prepare the product data
+    const productData = {
+      name: data.name,
+      description: data.description,
+      price: parseFloat(data.price),
+      images: data.images || [],
+      category: new ObjectId(data.categoryId),
+      brand: data.brand,
+      inventory: {
+        quantity: parseInt(data.stock),
+        lowStockThreshold: data.lowStockThreshold || 5
+      },
+      isActive: data.isPublished || false,
+      isFeatured: data.isFeatured || false,
+      trackInventory: data.trackInventory || true,
+      sku: data.sku || null,
+      comparePrice: data.comparePrice ? parseFloat(data.comparePrice) : null,
+      vendor: {
+        _id: new ObjectId(session.user.id),
+        name: session.user.name || "Unknown Vendor",
+        email: session.user.email || ""
+      },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: session.user.id
+    };
 
     const result = await db.collection("products").insertOne(productData);
 
@@ -129,22 +189,44 @@ export async function POST(request: Request) {
           $unwind: "$categoryDetails"
         },
         {
+          $lookup: {
+            from: "vendors",
+            localField: "vendor",
+            foreignField: "_id",
+            as: "vendorDetails"
+          }
+        },
+        {
+          $unwind: {
+            path: "$vendorDetails",
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        {
           $project: {
             _id: 1,
             name: 1,
             description: 1,
             price: 1,
-            image: { $arrayElemAt: ["$images", 0] }, // Convert back to single image for frontend
-            images: 1, // Keep the original images array
+            comparePrice: 1,
+            images: 1,
             brand: 1,
             inventory: 1,
             isActive: 1,
+            isFeatured: 1,
+            trackInventory: 1,
+            sku: 1,
             createdAt: 1,
             updatedAt: 1,
             createdBy: 1,
             category: {
               _id: "$categoryDetails._id",
               name: "$categoryDetails.name"
+            },
+            vendor: {
+              _id: "$vendorDetails._id",
+              name: "$vendorDetails.name",
+              email: "$vendorDetails.email"
             }
           }
         }
@@ -171,9 +253,9 @@ export async function POST(request: Request) {
 // PUT update product
 export async function PUT(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as CustomSession | null;
 
-    if (!session || session.user.role !== "ADMIN") {
+    if (!session?.user?.role || !["ADMIN", "VENDOR"].includes(session.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -207,8 +289,28 @@ export async function PUT(request: Request) {
       );
     }
 
+    // If vendor, validate they own the product
+    if (session.user.role === "VENDOR") {
+      const product = await db
+        .collection("products")
+        .findOne({ 
+          _id: new ObjectId(_id),
+          "vendor._id": new ObjectId(session.user.id)
+        });
+
+      if (!product) {
+        return NextResponse.json(
+          { error: "Product not found or you don't have permission to edit it" },
+          { status: 404 }
+        );
+      }
+    }
+
     const result = await db.collection("products").findOneAndUpdate(
-      { _id: new ObjectId(_id) },
+      { 
+        _id: new ObjectId(_id),
+        ...(session.user.role === "VENDOR" ? { "vendor._id": new ObjectId(session.user.id) } : {})
+      },
       {
         $set: {
           ...updateData,
@@ -249,7 +351,12 @@ export async function PUT(request: Request) {
 // DELETE product
 export async function DELETE(request: Request) {
   try {
-    await clientPromise;
+    const session = await getServerSession(authOptions) as CustomSession | null;
+
+    if (!session?.user?.role || !["ADMIN", "VENDOR"].includes(session.user.role)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -263,9 +370,29 @@ export async function DELETE(request: Request) {
     const client = await clientPromise;
     const db = client.db();
 
-    const product = await db.collection("products").findOneAndDelete({ _id: new ObjectId(id) });
+    // If vendor, validate they own the product
+    if (session.user.role === "VENDOR") {
+      const product = await db
+        .collection("products")
+        .findOne({ 
+          _id: new ObjectId(id),
+          "vendor._id": new ObjectId(session.user.id)
+        });
 
-    if (!product) {
+      if (!product) {
+        return NextResponse.json(
+          { success: false, error: "Product not found or you don't have permission to delete it" },
+          { status: 404 }
+        );
+      }
+    }
+
+    const result = await db.collection("products").findOneAndDelete({
+      _id: new ObjectId(id),
+      ...(session.user.role === "VENDOR" ? { "vendor._id": new ObjectId(session.user.id) } : {})
+    });
+
+    if (!result) {
       return NextResponse.json(
         { success: false, error: "Product not found" },
         { status: 404 }

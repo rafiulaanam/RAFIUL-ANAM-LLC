@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ImagePlus, Loader2 } from "lucide-react";
+import { ImagePlus, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface Category {
@@ -24,9 +24,17 @@ interface Category {
   description?: string;
 }
 
+interface UploadResponse {
+  success: boolean;
+  url: string;
+  public_id: string;
+  error?: string;
+}
+
 export default function AddProductPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -36,6 +44,8 @@ export default function AddProductPage() {
     price: "",
     comparePrice: "",
     stock: "",
+    lowStockThreshold: "5",
+    brand: "",
     sku: "",
     isPublished: false,
     isFeatured: false,
@@ -51,7 +61,8 @@ export default function AddProductPage() {
           const data = await response.json();
           setCategories(data);
         } else {
-          toast.error("Failed to load categories");
+          const error = await response.json();
+          toast.error(error.error || "Failed to load categories");
         }
       } catch (error) {
         console.error("Error fetching categories:", error);
@@ -64,23 +75,42 @@ export default function AddProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
     if (!selectedCategory) {
       toast.error("Please select a category");
+      return;
+    }
+
+    if (!formData.brand.trim()) {
+      toast.error("Please enter a brand name");
+      return;
+    }
+
+    if (images.length === 0) {
+      toast.error("Please add at least one product image");
       return;
     }
 
     setIsLoading(true);
     try {
       const productData = {
-        ...formData,
+        name: formData.name.trim(),
+        description: formData.description.trim(),
         categoryId: selectedCategory,
         price: parseFloat(formData.price),
         comparePrice: formData.comparePrice ? parseFloat(formData.comparePrice) : undefined,
         stock: parseInt(formData.stock),
+        lowStockThreshold: parseInt(formData.lowStockThreshold),
+        brand: formData.brand.trim(),
+        sku: formData.sku.trim() || undefined,
+        isPublished: formData.isPublished,
+        isFeatured: formData.isFeatured,
+        trackInventory: formData.trackInventory,
         images
       };
 
-      const response = await fetch("/api/vendor/products", {
+      const response = await fetch("/api/products", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -88,12 +118,14 @@ export default function AddProductPage() {
         body: JSON.stringify(productData),
       });
 
+      const result = await response.json();
+
       if (response.ok) {
         toast.success("Product created successfully");
         router.push("/vendor/products");
+        router.refresh();
       } else {
-        const error = await response.json();
-        toast.error(error.message || "Failed to create product");
+        toast.error(result.error || "Failed to create product");
       }
     } catch (error) {
       console.error("Error creating product:", error);
@@ -103,25 +135,86 @@ export default function AddProductPage() {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      const newImages = Array.from(files).map((file) =>
-        URL.createObjectURL(file)
-      );
-      setImages((prev) => [...prev, ...newImages]);
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to upload image");
     }
+
+    const data: UploadResponse = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || "Failed to upload image");
+    }
+
+    return data.url;
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+
+    setIsUploading(true);
+    const uploadPromises: Promise<string>[] = [];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    try {
+      // Validate files
+      const validFiles = Array.from(files).filter(file => {
+        if (file.size > maxSize) {
+          toast.error(`File ${file.name} is too large. Maximum size is 5MB`);
+          return false;
+        }
+        if (!file.type.startsWith('image/')) {
+          toast.error(`File ${file.name} is not an image`);
+          return false;
+        }
+        return true;
+      });
+
+      if (validFiles.length === 0) {
+        return;
+      }
+
+      // Upload valid files
+      validFiles.forEach(file => {
+        uploadPromises.push(uploadImage(file));
+      });
+
+      const uploadedUrls = await Promise.all(uploadPromises);
+      setImages(prev => [...prev, ...uploadedUrls]);
+      toast.success(`Successfully uploaded ${uploadedUrls.length} image${uploadedUrls.length === 1 ? '' : 's'}`);
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to upload images");
+    } finally {
+      setIsUploading(false);
+      if (e.target) {
+        e.target.value = '';
+      }
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
+    setFormData(prev => ({ ...prev, [id]: value }));
   };
 
   const handleSwitchChange = (id: string, checked: boolean) => {
-    setFormData((prev) => ({ ...prev, [id]: checked }));
+    setFormData(prev => ({ ...prev, [id]: checked }));
   };
 
   return (
@@ -155,6 +248,16 @@ export default function AddProductPage() {
                   value={formData.description}
                   onChange={handleInputChange}
                   rows={4}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="brand">Brand</Label>
+                <Input
+                  id="brand"
+                  placeholder="Enter brand name"
+                  value={formData.brand}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
@@ -226,13 +329,34 @@ export default function AddProductPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="sku">SKU</Label>
+                <Label htmlFor="lowStockThreshold">Low Stock Alert Threshold</Label>
+                <Input
+                  id="lowStockThreshold"
+                  type="number"
+                  min="1"
+                  value={formData.lowStockThreshold}
+                  onChange={handleInputChange}
+                  placeholder="Enter low stock threshold"
+                />
+              </div>
+              <div>
+                <Label htmlFor="sku">SKU (Stock Keeping Unit)</Label>
                 <Input
                   id="sku"
                   value={formData.sku}
                   onChange={handleInputChange}
                   placeholder="Enter SKU"
                 />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="trackInventory"
+                  checked={formData.trackInventory}
+                  onCheckedChange={(checked) =>
+                    handleSwitchChange("trackInventory", checked)
+                  }
+                />
+                <Label htmlFor="trackInventory">Track Inventory</Label>
               </div>
             </div>
           </Card>
@@ -245,99 +369,89 @@ export default function AddProductPage() {
                 {images.map((image, index) => (
                   <div
                     key={index}
-                    className="relative aspect-square rounded-lg border bg-gray-50"
+                    className="group relative aspect-square rounded-lg border bg-gray-50"
                   >
                     <img
                       src={image}
                       alt={`Product ${index + 1}`}
                       className="h-full w-full rounded-lg object-cover"
                     />
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="absolute right-2 top-2"
-                      onClick={() =>
-                        setImages((prev) =>
-                          prev.filter((_, i) => i !== index)
-                        )
-                      }
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute -right-2 -top-2 hidden rounded-full bg-red-500 p-1 text-white group-hover:block"
                     >
-                      ×
-                    </Button>
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
                 ))}
-                <label className="flex aspect-square cursor-pointer items-center justify-center rounded-lg border border-dashed bg-gray-50 hover:bg-gray-100">
+                <label className={`flex aspect-square cursor-pointer items-center justify-center rounded-lg border-2 border-dashed bg-gray-50 hover:bg-gray-100 ${isUploading ? 'opacity-50' : ''}`}>
                   <div className="text-center">
-                    <ImagePlus className="mx-auto h-8 w-8 text-gray-400" />
-                    <span className="mt-2 block text-sm text-gray-600">
-                      Add Image
-                    </span>
+                    {isUploading ? (
+                      <Loader2 className="mx-auto h-8 w-8 animate-spin text-gray-400" />
+                    ) : (
+                      <>
+                        <ImagePlus className="mx-auto h-8 w-8 text-gray-400" />
+                        <span className="mt-2 block text-sm text-gray-600">
+                          Add Image
+                        </span>
+                      </>
+                    )}
                   </div>
                   <input
                     type="file"
-                    className="hidden"
                     accept="image/*"
                     multiple
                     onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={isUploading}
                   />
                 </label>
               </div>
+              <p className="text-sm text-gray-500">
+                Upload product images. The first image will be the main image.
+              </p>
             </div>
           </Card>
 
-          {/* Settings */}
+          {/* Publishing */}
           <Card className="p-6">
-            <h2 className="mb-4 text-lg font-semibold">Settings</h2>
+            <h2 className="mb-4 text-lg font-semibold">Publishing</h2>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Published</Label>
-                  <p className="text-sm text-gray-500">
-                    Make this product visible to customers
-                  </p>
-                </div>
+              <div className="flex items-center space-x-2">
                 <Switch
+                  id="isPublished"
                   checked={formData.isPublished}
-                  onCheckedChange={(checked) => handleSwitchChange("isPublished", checked)}
+                  onCheckedChange={(checked) =>
+                    handleSwitchChange("isPublished", checked)
+                  }
                 />
+                <Label htmlFor="isPublished">Publish Product</Label>
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Featured</Label>
-                  <p className="text-sm text-gray-500">
-                    Show this product in featured listings
-                  </p>
-                </div>
+              <div className="flex items-center space-x-2">
                 <Switch
+                  id="isFeatured"
                   checked={formData.isFeatured}
-                  onCheckedChange={(checked) => handleSwitchChange("isFeatured", checked)}
+                  onCheckedChange={(checked) =>
+                    handleSwitchChange("isFeatured", checked)
+                  }
                 />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Track Inventory</Label>
-                  <p className="text-sm text-gray-500">
-                    Monitor stock levels for this product
-                  </p>
-                </div>
-                <Switch
-                  checked={formData.trackInventory}
-                  onCheckedChange={(checked) => handleSwitchChange("trackInventory", checked)}
-                />
+                <Label htmlFor="isFeatured">Feature Product</Label>
               </div>
             </div>
           </Card>
         </div>
 
-        <div className="mt-6 flex justify-end gap-4">
+        <div className="mt-6 flex justify-end space-x-4">
           <Button
             type="button"
             variant="outline"
             onClick={() => router.back()}
+            disabled={isLoading || isUploading}
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" disabled={isLoading || isUploading}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create Product
           </Button>

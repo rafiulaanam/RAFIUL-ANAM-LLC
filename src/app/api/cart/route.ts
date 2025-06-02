@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbConnect } from "@/lib/db";
-import Cart from "@/models/Cart";
-import Product from "@/models/Product";
+import clientPromise from "@/lib/db";
+import { ObjectId } from "mongodb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
@@ -18,7 +17,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Connect to database
-    await dbConnect();
+    const client = await clientPromise;
+    const db = client.db();
 
     // Get request body
     const { productId, quantity } = await req.json();
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get product details
-    const product = await Product.findById(productId);
+    const product = await db.collection("products").findOne({ _id: new ObjectId(productId) });
     if (!product) {
       return NextResponse.json(
         { error: "Product not found" },
@@ -41,47 +41,75 @@ export async function POST(req: NextRequest) {
     }
 
     // Find existing cart or create new one
-    let cart = await Cart.findOne({ userId: session.user.email });
+    const cart = await db.collection("carts").findOne({ userId: session.user.email });
 
     if (cart) {
       // Cart exists - check if item exists
       const itemIndex = cart.items.findIndex(
-        item => item.productId.toString() === productId
+        (item: any) => item.productId.toString() === productId
       );
 
       if (itemIndex > -1) {
         // Update existing item
-        cart.items[itemIndex].quantity = quantity;
+        await db.collection("carts").updateOne(
+          { userId: session.user.email },
+          { 
+            $set: { 
+              [`items.${itemIndex}.quantity`]: quantity,
+              updatedAt: new Date()
+            } 
+          }
+        );
       } else {
         // Add new item
-        cart.items.push({
-          productId: product._id,
-          quantity,
-          price: product.price,
-          name: product.name,
-          image: product.images[0]
-        });
+        await db.collection("carts").updateOne(
+          { userId: session.user.email },
+          {
+            $push: {
+              items: {
+                productId: new ObjectId(productId),
+                quantity,
+                price: product.price,
+                name: product.name,
+                image: product.images[0]
+              }
+            },
+            $set: { updatedAt: new Date() }
+          }
+        );
       }
-
-      // Save updated cart
-      cart = await cart.save();
     } else {
       // Create new cart
-      cart = await Cart.create({
+      await db.collection("carts").insertOne({
         userId: session.user.email,
         items: [{
-          productId: product._id,
+          productId: new ObjectId(productId),
           quantity,
           price: product.price,
           name: product.name,
           image: product.images[0]
-        }]
+        }],
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
     }
 
-    // Populate product details before returning
-    await cart.populate('items.productId');
-    return NextResponse.json(cart);
+    // Get updated cart
+    const updatedCart = await db.collection("carts")
+      .aggregate([
+        { $match: { userId: session.user.email } },
+        {
+          $lookup: {
+            from: "products",
+            localField: "items.productId",
+            foreignField: "_id",
+            as: "productDetails"
+          }
+        }
+      ])
+      .next();
+
+    return NextResponse.json(updatedCart);
   } catch (error) {
     console.error("Cart API Error:", error);
     return NextResponse.json(
@@ -100,12 +128,22 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await dbConnect();
+    const client = await clientPromise;
+    const db = client.db();
     
-    const cart = await Cart.findOne(
-      { userId: session.user.email },
-      { items: 1, _id: 0 }
-    ).populate('items.productId');
+    const cart = await db.collection("carts")
+      .aggregate([
+        { $match: { userId: session.user.email } },
+        {
+          $lookup: {
+            from: "products",
+            localField: "items.productId",
+            foreignField: "_id",
+            as: "productDetails"
+          }
+        }
+      ])
+      .next();
 
     return NextResponse.json(cart?.items || []);
   } catch (error) {
@@ -126,9 +164,10 @@ export async function DELETE() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await dbConnect();
+    const client = await clientPromise;
+    const db = client.db();
     
-    await Cart.deleteOne({ userId: session.user.email });
+    await db.collection("carts").deleteOne({ userId: session.user.email });
 
     return NextResponse.json({ success: true });
   } catch (error) {

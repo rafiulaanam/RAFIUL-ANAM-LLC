@@ -114,7 +114,7 @@ export function useShoppingCart() {
         const errorText = await response.text();
         console.error("Failed to update quantity:", errorText);
         toast.error("Failed to update quantity. Please try again.");
-      }
+    }
     } catch (error) {
       console.error("Update quantity error:", error);
       toast.error("Failed to update quantity. Please check your connection.");
