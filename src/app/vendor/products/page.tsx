@@ -83,7 +83,7 @@ export default function VendorProductsPage() {
 
       if (response.ok) {
         toast.success("Product deleted successfully");
-        setProducts((prevProducts) =>
+    setProducts((prevProducts) =>
           prevProducts.filter((product) => product._id !== productId)
         );
       } else {
@@ -114,11 +114,11 @@ export default function VendorProductsPage() {
           <p className="text-gray-500">Manage your product listings</p>
         </div>
         <Button asChild>
-          <Link href="/vendor/products/new">
+        <Link href="/vendor/products/new">
             <Plus className="mr-2 h-4 w-4" />
             Add Product
           </Link>
-        </Button>
+          </Button>
       </div>
 
       <Card>
@@ -133,27 +133,27 @@ export default function VendorProductsPage() {
             <div className="flex h-[200px] flex-col items-center justify-center space-y-3 text-center">
               <div className="text-sm text-gray-500">
                 You haven&apos;t added any products yet
-              </div>
+          </div>
               <Button asChild variant="outline">
                 <Link href="/vendor/products/new">
                   <Plus className="mr-2 h-4 w-4" />
                   Add Your First Product
                 </Link>
               </Button>
-            </div>
+          </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
+          <Table>
+            <TableHeader>
+              <TableRow>
                   <TableHead>Image</TableHead>
                   <TableHead>Product Details</TableHead>
                   <TableHead>Inventory</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Status</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
                 {products.map((product) => (
                   <TableRow key={product._id}>
                     <TableCell>
@@ -167,7 +167,7 @@ export default function VendorProductsPage() {
                         <div className="h-12 w-12 rounded-md bg-gray-100" />
                       )}
                     </TableCell>
-                    <TableCell>
+                  <TableCell>
                       <div className="space-y-1">
                         <p className="font-medium">{product.name}</p>
                         <p className="text-sm text-gray-500">
@@ -196,9 +196,9 @@ export default function VendorProductsPage() {
                             ${product.comparePrice.toFixed(2)}
                           </p>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
+                    </div>
+                  </TableCell>
+                  <TableCell>
                       <div className="space-y-1">
                         <Badge
                           variant={product.isPublished ? "default" : "secondary"}
@@ -208,11 +208,11 @@ export default function VendorProductsPage() {
                         {product.isFeatured && (
                           <Badge variant="outline" className="ml-1">
                             Featured
-                          </Badge>
+                    </Badge>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell>
+                  </TableCell>
+                  <TableCell>
                       <div className="flex space-x-2">
                         <Button
                           variant="ghost"
@@ -236,11 +236,11 @@ export default function VendorProductsPage() {
                           )}
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
           )}
         </CardContent>
       </Card>

@@ -1,193 +1,121 @@
 "use client";
 
-import React, { createContext, useContext, useReducer, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from "react";
+import { useCartStore } from "@/store/useCartStore";
 
-// Define types
-export type Product = {
-  _id: string;
-  name: string;
-  price: number;
-  image: string;
-  description: string;
-  category: string;
-  brand: string;
-  rating: number;
-  reviews: number;
-};
-
-type ShopState = {
-  cart: Product[];
-  wishlist: Product[];
-  isLoading: boolean;
-  error: string | null;
-};
-
-type ShopAction =
-  | { type: "ADD_TO_CART"; payload: Product }
-  | { type: "REMOVE_FROM_CART"; payload: string }
-  | { type: "ADD_TO_WISHLIST"; payload: Product }
-  | { type: "REMOVE_FROM_WISHLIST"; payload: string }
-  | { type: "SET_LOADING"; payload: boolean }
-  | { type: "SET_ERROR"; payload: string | null }
-  | { type: "CLEAR_CART" }
-  | { type: "CLEAR_WISHLIST" }
-  | { type: "LOAD_CART"; payload: Product[] }
-  | { type: "LOAD_WISHLIST"; payload: Product[] };
-
-type ShopContextType = {
-  state: ShopState;
-  addToCart: (product: Product) => void;
-  removeFromCart: (productId: string) => void;
-  addToWishlist: (product: Product) => void;
+interface ShopContextType {
+  // Search and filtering
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  selectedCategory: string | null;
+  setSelectedCategory: (category: string | null) => void;
+  priceRange: { min: number; max: number };
+  setPriceRange: (range: { min: number; max: number }) => void;
+  sortOption: string;
+  setSortOption: (option: string) => void;
+  
+  // Wishlist functionality
+  wishlist: string[];
+  addToWishlist: (productId: string) => void;
   removeFromWishlist: (productId: string) => void;
-  clearCart: () => void;
-  clearWishlist: () => void;
   isInWishlist: (productId: string) => boolean;
-};
 
-// Create context
+  // Cart functionality (delegated to Zustand store)
+  addToCart: (product: any) => Promise<void>;
+  removeFromCart: (productId: string) => Promise<void>;
+  updateCartQuantity: (productId: string, quantity: number) => Promise<void>;
+  isInCart: (productId: string) => boolean;
+  getCartItemQuantity: (productId: string) => number;
+}
+
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
-// Initial state
-const initialState: ShopState = {
-  cart: [],
-  wishlist: [],
-  isLoading: false,
-  error: null,
-};
+export function ShopProvider({ children }: { children: ReactNode }) {
+  // Cart state from Zustand
+  const cartStore = useCartStore();
 
-// Reducer
-function shopReducer(state: ShopState, action: ShopAction): ShopState {
-  switch (action.type) {
-    case "ADD_TO_CART":
-      return {
-        ...state,
-        cart: [...state.cart, action.payload],
-      };
-    case "REMOVE_FROM_CART":
-      return {
-        ...state,
-        cart: state.cart.filter((item) => item._id !== action.payload),
-      };
-    case "ADD_TO_WISHLIST":
-      return {
-        ...state,
-        wishlist: [...state.wishlist, action.payload],
-      };
-    case "REMOVE_FROM_WISHLIST":
-      return {
-        ...state,
-        wishlist: state.wishlist.filter((item) => item._id !== action.payload),
-      };
-    case "SET_LOADING":
-      return {
-        ...state,
-        isLoading: action.payload,
-      };
-    case "SET_ERROR":
-      return {
-        ...state,
-        error: action.payload,
-      };
-    case "CLEAR_CART":
-      return {
-        ...state,
-        cart: [],
-      };
-    case "CLEAR_WISHLIST":
-      return {
-        ...state,
-        wishlist: [],
-      };
-    case "LOAD_CART":
-      return {
-        ...state,
-        cart: action.payload,
-      };
-    case "LOAD_WISHLIST":
-      return {
-        ...state,
-        wishlist: action.payload,
-      };
-    default:
-      return state;
-  }
-}
-
-// Provider component
-export function ShopProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(shopReducer, initialState);
-  const { data: session } = useSession();
-
-  // Load cart and wishlist data when session changes
+  // Initialize cart on mount
   useEffect(() => {
-    const loadUserData = async () => {
-      if (session?.user) {
-        try {
-          dispatch({ type: "SET_LOADING", payload: true });
-          
-          // Load cart data from API
-          const cartResponse = await fetch("/api/cart");
-          if (cartResponse.ok) {
-            const cartData = await cartResponse.json();
-            dispatch({ type: "LOAD_CART", payload: cartData });
-          }
+    if (!cartStore.initialized) {
+      cartStore.loadCart();
+    }
+  }, [cartStore.initialized]);
 
-          // Load wishlist data from API
-          const wishlistResponse = await fetch("/api/wishlist");
-          if (wishlistResponse.ok) {
-            const wishlistData = await wishlistResponse.json();
-            dispatch({ type: "LOAD_WISHLIST", payload: wishlistData });
-          }
-        } catch (error) {
-          dispatch({ 
-            type: "SET_ERROR", 
-            payload: "Failed to load shop data" 
-          });
-        } finally {
-          dispatch({ type: "SET_LOADING", payload: false });
-        }
-      } else {
-        // Clear data when user logs out
-        dispatch({ type: "CLEAR_CART" });
-        dispatch({ type: "CLEAR_WISHLIST" });
-      }
-    };
+  // Search and filtering state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 });
+  const [sortOption, setSortOption] = useState("featured");
 
-    loadUserData();
-  }, [session]);
+  // Wishlist state
+  const [wishlist, setWishlist] = useState<string[]>([]);
 
-  // Context value
-  const value: ShopContextType = {
-    state,
-    addToCart: (product) => {
-      dispatch({ type: "ADD_TO_CART", payload: product });
-    },
-    removeFromCart: (productId) => {
-      dispatch({ type: "REMOVE_FROM_CART", payload: productId });
-    },
-    addToWishlist: (product) => {
-      dispatch({ type: "ADD_TO_WISHLIST", payload: product });
-    },
-    removeFromWishlist: (productId) => {
-      dispatch({ type: "REMOVE_FROM_WISHLIST", payload: productId });
-    },
-    clearCart: () => {
-      dispatch({ type: "CLEAR_CART" });
-    },
-    clearWishlist: () => {
-      dispatch({ type: "CLEAR_WISHLIST" });
-    },
-    isInWishlist: (productId) => {
-      return state.wishlist.some((item) => item._id === productId);
-    },
-  };
+  // Wishlist methods
+  const addToWishlist = useCallback((productId: string) => {
+    setWishlist(prev => [...new Set([...prev, productId])]);
+  }, []);
 
-  return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
+  const removeFromWishlist = useCallback((productId: string) => {
+    setWishlist(prev => prev.filter(id => id !== productId));
+  }, []);
+
+  const isInWishlist = useCallback((productId: string) => {
+    return wishlist.includes(productId);
+  }, [wishlist]);
+
+  // Cart methods (delegated to Zustand store)
+  const addToCart = useCallback(async (product: any) => {
+    await cartStore.addItem(product);
+  }, [cartStore]);
+
+  const removeFromCart = useCallback(async (productId: string) => {
+    await cartStore.removeItem(productId);
+  }, [cartStore]);
+
+  const updateCartQuantity = useCallback(async (productId: string, quantity: number) => {
+    await cartStore.updateQuantity(productId, quantity);
+  }, [cartStore]);
+
+  const isInCart = useCallback((productId: string) => {
+    return cartStore.cart?.items?.some(item => item.productId === productId) ?? false;
+  }, [cartStore.cart?.items]);
+
+  const getCartItemQuantity = useCallback((productId: string) => {
+    return cartStore.cart?.items?.find(item => item.productId === productId)?.quantity ?? 0;
+  }, [cartStore.cart?.items]);
+
+  return (
+    <ShopContext.Provider
+      value={{
+        // Search and filtering
+        searchTerm,
+        setSearchTerm,
+        selectedCategory,
+        setSelectedCategory,
+        priceRange,
+        setPriceRange,
+        sortOption,
+        setSortOption,
+        
+        // Wishlist
+        wishlist,
+        addToWishlist,
+        removeFromWishlist,
+        isInWishlist,
+
+        // Cart (delegated to Zustand store)
+        addToCart,
+        removeFromCart,
+        updateCartQuantity,
+        isInCart,
+        getCartItemQuantity,
+      }}
+    >
+      {children}
+    </ShopContext.Provider>
+  );
 }
 
-// Hook for using the shop context
 export function useShop() {
   const context = useContext(ShopContext);
   if (context === undefined) {

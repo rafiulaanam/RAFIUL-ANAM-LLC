@@ -36,7 +36,8 @@ export function useShoppingCart() {
         const response = await fetch("/api/cart");
         
         if (response.ok) {
-          const items = await response.json();
+          const data = await response.json();
+          const items = data.items || [];
           const total = items.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0);
           setCart({ items, total });
         } else {
@@ -75,10 +76,11 @@ export function useShoppingCart() {
       });
 
       if (response.ok) {
-        const updatedCart = await response.json();
+        const data = await response.json();
+        const items = data.items || [];
         setCart({
-          items: updatedCart.items,
-          total: updatedCart.items.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0)
+          items,
+          total: items.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0)
         });
         toast.success(`${item.name} added to cart`);
       } else {
@@ -107,14 +109,15 @@ export function useShoppingCart() {
       });
 
       if (response.ok) {
-        const { items } = await response.json();
+        const data = await response.json();
+        const items = data.items || [];
         const total = items.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0);
         setCart({ items, total });
-    } else {
+      } else {
         const errorText = await response.text();
         console.error("Failed to update quantity:", errorText);
         toast.error("Failed to update quantity. Please try again.");
-    }
+      }
     } catch (error) {
       console.error("Update quantity error:", error);
       toast.error("Failed to update quantity. Please check your connection.");
@@ -131,10 +134,11 @@ export function useShoppingCart() {
       });
 
       if (response.ok) {
-        const newItems = cart.items.filter(item => item.productId !== productId);
-        const total = newItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        setCart({ items: newItems, total });
-      toast.success("Item removed from cart");
+        const data = await response.json();
+        const items = data.items || [];
+        const total = items.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0);
+        setCart({ items, total });
+        toast.success("Item removed from cart");
       } else {
         const errorText = await response.text();
         console.error("Failed to remove item:", errorText);

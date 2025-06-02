@@ -93,7 +93,7 @@ export async function GET(request: Request, { params }: Params) {
         }
       ])
       .toArray();
-
+    
     if (!product) {
       return NextResponse.json(
         { error: "Product not found" },
@@ -101,25 +101,34 @@ export async function GET(request: Request, { params }: Params) {
       );
     }
 
-    // Transform ObjectIds to strings
+    // Transform ObjectIds to strings and ensure consistent data structure
     const transformedProduct = {
       ...product,
       _id: product._id.toString(),
-      vendorId: product.vendorId ? product.vendorId.toString() : null,
-      categoryId: product.categoryId ? product.categoryId.toString() : null,
+      name: product.name,
+      price: product.price,
+      description: product.description || "",
       images: Array.isArray(product.images) 
         ? product.images 
         : product.image 
           ? [product.image]
           : ['/placeholder-image.jpg'],
-      vendor: product.vendor ? {
-        ...product.vendor,
-        _id: product.vendor._id.toString()
-      } : null,
-      category: product.category ? {
-        ...product.category,
-        _id: product.category._id.toString()
-      } : null
+      category: product.category 
+        ? {
+            _id: product.category._id.toString(),
+            name: product.category.name
+          }
+        : null,
+      brand: product.brand || null,
+      rating: product.rating || 0,
+      reviews: product.reviews || 0,
+      vendorId: product.vendorId ? product.vendorId.toString() : null,
+      vendor: product.vendor 
+        ? {
+            _id: product.vendor._id.toString(),
+            name: product.vendor.name
+          }
+        : null
     };
 
     return NextResponse.json(transformedProduct);
@@ -206,7 +215,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const updatedProduct = await db.collection("products").findOne({
       _id: new ObjectId(params.id)
     });
-
+    
     return NextResponse.json({
       ...updatedProduct,
       _id: updatedProduct._id.toString(),
@@ -259,7 +268,7 @@ export async function DELETE(request: Request, { params }: Params) {
       vendorId: vendor._id,
       deletedAt: { $exists: false }
     });
-
+    
     if (!product) {
       return NextResponse.json(
         { error: "Product not found" },
