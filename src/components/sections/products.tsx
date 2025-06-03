@@ -14,10 +14,12 @@ interface Product {
   price: number;
   rating: number;
   images: string[];
-  category: string;
+  categoryName: string;
   description: string;
   featured: boolean;
   quantity: number;
+  comparePrice?: number;
+  discount?: number;
 }
 
 interface ApiResponse {
@@ -38,14 +40,25 @@ export default function Products() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
+        console.log("Fetching featured products...");
         const response = await fetch("/api/products/featured");
+        console.log("Response status:", response.status);
+        
         const data: ApiResponse = await response.json();
+        console.log("API Response:", data);
 
         if (!response.ok) {
           throw new Error(data.error || "Failed to fetch products");
         }
 
-        setProducts(data.products);
+        if (data.products && Array.isArray(data.products)) {
+          console.log("Number of products fetched:", data.products.length);
+          setProducts(data.products);
+        } else {
+          console.error("Invalid products data:", data);
+          throw new Error("Invalid products data received");
+        }
+        
         setMessage(data.message || null);
         setError(null);
       } catch (error) {
@@ -165,17 +178,29 @@ export default function Products() {
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-300"
                   />
+                  {product.discount && product.discount > 0 && (
+                    <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-sm font-medium">
+                      {product.discount}% OFF
+                    </div>
+                  )}
                 </div>
               </Link>
               <div className="p-6">
-                <p className="text-sm text-muted-foreground mb-2">{product.category}</p>
+                <p className="text-sm text-muted-foreground mb-2">{product.categoryName}</p>
                 <Link href={`/products/${product._id}`}>
-                  <h3 className="font-semibold text-lg mb-2 hover:text-primary transition-colors">
+                  <h3 className="font-semibold text-lg mb-2 hover:text-primary transition-colors line-clamp-2">
                     {product.name}
                   </h3>
                 </Link>
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-xl font-bold">${product.price.toFixed(2)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-bold">${product.price.toFixed(2)}</span>
+                    {product.comparePrice && product.comparePrice > product.price && (
+                      <span className="text-sm text-muted-foreground line-through">
+                        ${product.comparePrice.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center">
                     <Star className="h-4 w-4 text-yellow-400 fill-current" />
                     <span className="ml-1 text-sm">{product.rating}</span>

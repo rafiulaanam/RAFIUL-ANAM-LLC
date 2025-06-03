@@ -1,52 +1,56 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 
-const categories = [
-  {
-    name: "Electronics",
-    description: "Latest gadgets and tech accessories",
-    image: "/images/product.png",
-    itemCount: 120,
-    href: "/categories/electronics",
-  },
-  {
-    name: "Fashion",
-    description: "Trendy clothing and accessories",
-    image: "/images/product.png",
-    itemCount: 350,
-    href: "/categories/fashion",
-  },
-  {
-    name: "Home & Living",
-    description: "Furniture and home decor",
-    image: "/images/product.png",
-    itemCount: 240,
-    href: "/categories/home-living",
-  },
-  {
-    name: "Beauty",
-    description: "Cosmetics and personal care",
-    image: "/images/product.png",
-    itemCount: 180,
-    href: "/categories/beauty",
-  },
-  {
-    name: "Sports",
-    description: "Athletic gear and equipment",
-    image: "/images/product.png",
-    itemCount: 150,
-    href: "/categories/sports",
-  },
-  {
-    name: "Books",
-    description: "Books and stationery",
-    image: "/images/product.png",
-    itemCount: 200,
-    href: "/categories/books",
-  },
-];
+interface Category {
+  _id: string;
+  name: string;
+  description: string;
+  image: string;
+  productCount?: number;
+}
 
 export default function Categories() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories');
+        if (!response.ok) throw new Error('Failed to fetch categories');
+        const data = await response.json();
+        setCategories(data);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <section className="py-20 bg-white dark:bg-gray-900">
+        <div className="container mx-auto px-4">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+            <p className="mt-2 text-muted-foreground">Loading categories...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!categories.length) {
+    return null;
+  }
+
   return (
     <section className="py-20 bg-white dark:bg-gray-900">
       <div className="container mx-auto px-4">
@@ -61,13 +65,13 @@ export default function Categories() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {categories.map((category) => (
             <Link
-              key={category.name}
-              href={category.href}
+              key={category._id}
+              href={`/shop?category=${category._id}`}
               className="group relative overflow-hidden rounded-2xl"
             >
               <div className="relative h-80">
                 <Image
-                  src={category.image}
+                  src={category.image || "/images/product.png"}
                   alt={category.name}
                   fill
                   className="object-cover transition-transform duration-300 group-hover:scale-110"
@@ -78,9 +82,11 @@ export default function Categories() {
                   <p className="text-sm text-gray-200 mb-2">
                     {category.description}
                   </p>
-                  <span className="text-sm font-medium">
-                    {category.itemCount} items
-                  </span>
+                  {category.productCount !== undefined && (
+                    <span className="text-sm font-medium">
+                      {category.productCount} items
+                    </span>
+                  )}
                 </div>
               </div>
             </Link>

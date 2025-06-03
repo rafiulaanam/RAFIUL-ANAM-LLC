@@ -1,50 +1,57 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/db";
+import { ObjectId } from "mongodb";
 
 export async function GET() {
   try {
+    console.log("Starting featured products fetch...");
     const client = await clientPromise;
     const db = client.db();
     
-    // Check if products collection exists and has documents
-    const collectionExists = await db.listCollections({ name: 'products' }).hasNext();
-    if (!collectionExists) {
-      // Return empty array if collection doesn't exist
-      return NextResponse.json({ 
-        products: [],
-        message: "No products available in the shop yet" 
-      });
-    }
+    // Build query for featured products
+    const query = {
+      deletedAt: { $exists: false },
+      isPublished: true,
+      isFeatured: true
+    };
 
-    // Fetch featured products with inventory > 0
+    // Fetch featured products
+    console.log("Fetching featured and published products...");
     const products = await db
       .collection("products")
-      .find({ 
-        isActive: true,
-        quantity: { $gt: 0 }
-      })
-      .sort({ 
-        featured: -1,
-        rating: -1,
-        createdAt: -1 
-      })
+      .find(query)
+      .sort({ createdAt: -1 })
       .limit(8)
-      .project({
-        _id: 1,
-        name: 1,
-        price: 1,
-        description: 1,
-        images: 1,
-        rating: 1,
-        category: 1,
-        featured: 1,
-        quantity: 1
-      })
       .toArray();
 
+    console.log("Featured and published products found:", products.length);
+
+    // Transform products
+    const transformedProducts = await Promise.all(
+      products.map(async (product) => {
+        // Get category details
+        const category = product.categoryId
+          ? await db.collection("categories").findOne(
+              { _id: new ObjectId(product.categoryId) },
+              { projection: { name: 1 } }
+            )
+          : null;
+
+        return {
+          ...product,
+          _id: product._id.toString(),
+          categoryId: product.categoryId?.toString(),
+          categoryName: category?.name || null,
+          discount: product.comparePrice 
+            ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
+            : 0
+        };
+      })
+    );
+
     return NextResponse.json({ 
-      products,
-      message: products.length === 0 ? "No products available in the shop yet" : undefined
+      products: transformedProducts,
+      message: transformedProducts.length === 0 ? "No featured products available yet" : undefined
     });
 
   } catch (error) {
@@ -53,10 +60,9 @@ export async function GET() {
       { 
         products: [],
         error: "Failed to fetch products",
-        message: "Something went wrong. Please try again later."
+        message: error instanceof Error ? error.message : "Something went wrong. Please try again later."
       },
       { status: 500 }
     );
-  
   }
 } 

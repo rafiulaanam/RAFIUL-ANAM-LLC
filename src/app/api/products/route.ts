@@ -37,6 +37,7 @@ export async function GET(request: Request) {
     // Build query
     const query: any = {
       deletedAt: { $exists: false },
+      isPublished: true,
       price: { $gte: minPrice, $lte: maxPrice }
     };
 

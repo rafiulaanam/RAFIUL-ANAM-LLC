@@ -114,7 +114,7 @@ export default function ShopPage() {
     maxPrice: number
   ) => {
     try {
-      const queryParams = new URLSearchParams({
+        const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: limit.toString(),
         ...(category && { category }),
@@ -122,23 +122,23 @@ export default function ShopPage() {
         ...(search && { q: search }),
         minPrice: minPrice.toString(),
         maxPrice: maxPrice.toString(),
-      });
+        });
 
       const response = await fetch(`/api/products?${queryParams}`);
-      if (!response.ok) {
+        if (!response.ok) {
         throw new Error("Failed to fetch products");
-      }
-
+        }
+        
       const data = await response.json();
-      setProducts(data.products);
+          setProducts(data.products);
       setTotalProducts(data.total);
       setIsLoading(false);
-    } catch (error) {
+      } catch (error) {
       console.error("Error fetching products:", error);
       toast.error("Failed to load products");
-      setIsLoading(false);
-    }
-  };
+        setIsLoading(false);
+      }
+    };
 
   const totalPages = Math.ceil(totalProducts / pageSize);
 
@@ -314,79 +314,79 @@ export default function ShopPage() {
   }
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 min-h-screen">
+    <div className="bg-gray-50 dark:bg-gray-900">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-white pt-16 dark:bg-gray-800 dark:border-gray-700">
+      <aside className="fixed left-0 top-0 z-40 h-[calc(100vh-4rem)] w-64 border-r bg-white pt-16 dark:bg-gray-800 dark:border-gray-700">
         <div className="h-full overflow-y-auto px-3 py-4">
-          <div className="space-y-6">
-            {/* Search */}
-            <div>
+        <div className="space-y-6">
+          {/* Search */}
+          <div>
               <h3 className="mb-4 text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase">
                 Search Products
               </h3>
               <form onSubmit={handleSearch} className="flex gap-2">
-                <Input
-                  placeholder="Search products..."
+              <Input
+                placeholder="Search products..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="flex-1"
-                />
+              />
                 <Button type="submit" size="icon" variant="secondary">
-                  <Search className="h-4 w-4" />
-                </Button>
-              </form>
-            </div>
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
+          </div>
 
-            {/* Categories */}
-            <div>
+          {/* Categories */}
+          <div>
               <h3 className="mb-4 text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase">
                 Categories
               </h3>
               <div className="space-y-1 max-h-[200px] overflow-y-auto pr-2">
-                <Button
+              <Button
                   variant={selectedCategory === "" ? "default" : "ghost"}
                   className="w-full justify-start text-sm"
                   onClick={() => handleCategoryChange("")}
-                >
-                  All Categories
-                </Button>
-                {categories.map((category) => (
-                  <Button
-                    key={category._id}
+              >
+                All Categories
+              </Button>
+              {categories.map((category) => (
+                <Button
+                  key={category._id}
                     variant={selectedCategory === category._id ? "default" : "ghost"}
                     className="w-full justify-start text-sm"
                     onClick={() => handleCategoryChange(category._id)}
-                  >
-                    {category.name}
-                  </Button>
-                ))}
-              </div>
+                >
+                  {category.name}
+                </Button>
+              ))}
+            </div>
             </div>
 
-            {/* Brands */}
-            <div>
+          {/* Brands */}
+          <div>
               <h3 className="mb-4 text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase">
                 Brands
               </h3>
               <div className="space-y-1 max-h-[200px] overflow-y-auto pr-2">
-                <Button
+              <Button
                   variant={!selectedBrand ? "default" : "ghost"}
                   className="w-full justify-start text-sm"
                   onClick={() => handleBrandChange("")}
-                >
-                  All Brands
-                </Button>
-                {brands.map((brand) => (
-                  <Button
-                    key={brand}
+              >
+                All Brands
+              </Button>
+              {brands.map((brand) => (
+                <Button
+                  key={brand}
                     variant={selectedBrand === brand ? "default" : "ghost"}
                     className="w-full justify-start text-sm"
                     onClick={() => handleBrandChange(brand)}
-                  >
-                    {brand}
-                  </Button>
-                ))}
-              </div>
+                >
+                  {brand}
+                </Button>
+              ))}
+            </div>
             </div>
 
             {/* Price Range */}
@@ -406,9 +406,9 @@ export default function ShopPage() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-300">${priceRange[0]}</span>
                   <span className="text-gray-600 dark:text-gray-300">${priceRange[1]}</span>
-                </div>
-              </div>
-            </div>
+          </div>
+        </div>
+      </div>
 
             {/* Sort */}
             <div>
@@ -456,9 +456,9 @@ export default function ShopPage() {
       </aside>
 
       {/* Main Content */}
-      <div className="p-4 sm:ml-64">
-        <div className="mt-14">
-          {/* Header */}
+      <div className="sm:ml-64">
+        <div className="container mx-auto px-4 py-8">
+        {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
               All Products
@@ -481,19 +481,19 @@ export default function ShopPage() {
                 <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
                   <SelectTrigger className="w-[100px]">
                     <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
+            </SelectTrigger>
+            <SelectContent>
                     {PAGE_SIZES.map((size) => (
                       <SelectItem key={size} value={size.toString()}>
                         {size} items
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
+            </SelectContent>
+          </Select>
               </div>
-            </div>
+        </div>
 
-            {/* Products Grid */}
+        {/* Products Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {products.map((product) => (
                 <Card key={product._id} className="group relative overflow-hidden border-0 bg-white dark:bg-gray-800">
@@ -624,24 +624,24 @@ export default function ShopPage() {
                           </div>
                         </div>
                       ) : (
-                        <Button
+                          <Button
                           size="sm"
                           className="gap-2"
-                          onClick={() => handleAddToCart(product)}
-                          disabled={addingToCart[product._id] || cartLoading}
-                        >
-                          {addingToCart[product._id] ? (
-                            <>
+                            onClick={() => handleAddToCart(product)}
+                            disabled={addingToCart[product._id] || cartLoading}
+                          >
+                            {addingToCart[product._id] ? (
+                              <>
                               <Check className="h-4 w-4" />
-                              Added
-                            </>
-                          ) : (
-                            <>
+                                Added
+                              </>
+                            ) : (
+                              <>
                               <ShoppingCart className="h-4 w-4" />
-                              Add
-                            </>
-                          )}
-                        </Button>
+                                Add
+                              </>
+                            )}
+                          </Button>
                       )}
                     </div>
 
@@ -660,7 +660,7 @@ export default function ShopPage() {
 
             {/* Pagination */}
             {totalProducts > 0 && (
-              <div className="mt-8 flex items-center justify-center space-x-2">
+              <div className="mt-8 mb-8 flex items-center justify-center space-x-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -682,7 +682,7 @@ export default function ShopPage() {
                       <div key={page} className="flex items-center">
                         {index > 0 && array[index - 1] !== page - 1 && (
                           <span className="px-2 text-muted-foreground">...</span>
-                        )}
+                )}
                         <Button
                           variant={currentPage === page ? "default" : "outline"}
                           size="sm"
@@ -693,7 +693,7 @@ export default function ShopPage() {
                         </Button>
                       </div>
                     ))}
-                </div>
+              </div>
                 <Button
                   variant="outline"
                   size="sm"
