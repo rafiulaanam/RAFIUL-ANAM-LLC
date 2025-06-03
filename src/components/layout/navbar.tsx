@@ -8,92 +8,117 @@ import { Icons } from "@/components/ui/icons";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileMenu } from "@/components/layout/profile-menu";
+import { useState } from "react";
+import { X } from "lucide-react";
 
 export default function Navbar() {
   const { data: session } = useSession();
   const { cart, isLoading, itemCount } = useShoppingCart();
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        {/* Mobile Menu */}
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="md:hidden">
-              <Icons.menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-[300px] sm:w-[400px]">
-            <nav className="flex flex-col space-y-4 mt-4">
-              <Link href="/shop" className="text-lg">Shop</Link>
-              <Link href="/categories" className="text-lg">Categories</Link>
-              <Link href="/deals" className="text-lg">Deals</Link>
-              <Link href="/about" className="text-lg">About</Link>
-            </nav>
-          </SheetContent>
-        </Sheet>
-
-        {/* Desktop Logo & Nav */}
-        <div className="mr-4 hidden md:flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Icons.logo className="h-6 w-6" />
-            <span className="hidden font-bold sm:inline-block">
-              E-commerce
-            </span>
-          </Link>
-          <nav className="flex items-center space-x-6 text-sm font-medium">
-            <Link 
-              href="/shop" 
-              className="transition-colors hover:text-primary"
-            >
-              Shop
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between">
+          {/* Desktop Logo & Navigation */}
+          <div className="hidden md:flex items-center space-x-6">
+            <Link href="/" className="flex items-center space-x-2">
+              <Icons.logo className="h-6 w-6" />
+              <span className="font-bold">E-commerce</span>
             </Link>
-            <Link 
-              href="/categories"
-              className="transition-colors hover:text-primary"
-            >
-              Categories
-            </Link>
-            <Link 
-              href="/deals"
-              className="transition-colors hover:text-primary"
-            >
-              Deals
-            </Link>
-            <Link 
-              href="/about"
-              className="transition-colors hover:text-primary"
-            >
-              About
-            </Link>
-          </nav>
-        </div>
-
-        {/* Mobile Logo */}
-        <div className="md:hidden flex-1 flex justify-center">
-          <Link href="/" className="font-bold text-lg">
-            My E-commerce
-          </Link>
-        </div>
-
-        {/* Right Section */}
-        <div className="flex flex-1 items-center justify-end space-x-4">
-          <nav className="flex items-center space-x-2">
-            <ThemeToggle />
-            {session?.user && (
-              <Link href="/cart">
-                <Button variant="ghost" className="relative">
-                  <Icons.cart className="h-5 w-5" />
-                  {!isLoading && itemCount > 0 && (
-                    <span className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-primary text-xs text-primary-foreground flex items-center justify-center">
-                      {itemCount}
-                    </span>
-                  )}
-                </Button>
+            <nav className="flex items-center space-x-4 lg:space-x-6">
+              <Link href="/shop" className="text-sm font-medium transition-colors hover:text-primary">
+                Shop
               </Link>
-            )}
+              <Link href="/categories" className="text-sm font-medium transition-colors hover:text-primary">
+                Categories
+              </Link>
+              <Link href="/deals" className="text-sm font-medium transition-colors hover:text-primary">
+                Deals
+              </Link>
+              <Link href="/about" className="text-sm font-medium transition-colors hover:text-primary">
+                About
+              </Link>
+            </nav>
+          </div>
+
+          {/* Mobile Logo */}
+          <div className="md:hidden flex items-center">
+            <button
+              className="p-2 -ml-3 text-muted-foreground"
+              onClick={() => setIsOpen(!isOpen)}
+            >
+              <Icons.menu className="h-6 w-6" />
+            </button>
+            <Link href="/" className="ml-2 font-bold text-lg">
+              E-commerce
+            </Link>
+          </div>
+
+          {/* Right Section */}
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" size="icon" className="relative">
+              <Icons.cart className="h-5 w-5" />
+              {!isLoading && itemCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground flex items-center justify-center">
+                  {itemCount}
+                </span>
+              )}
+            </Button>
             <ProfileMenu />
-          </nav>
+          </div>
+        </div>
+
+        {/* Mobile Navigation Menu */}
+        <div
+          className={`md:hidden fixed inset-0 z-50 bg-background transform ${
+            isOpen ? "translate-x-0" : "-translate-x-full"
+          } transition-transform duration-200 ease-in-out`}
+        >
+          <div className="flex flex-col h-full p-4">
+            <div className="flex justify-between items-center mb-8">
+              <Link href="/" className="flex items-center space-x-2" onClick={() => setIsOpen(false)}>
+                <Icons.logo className="h-6 w-6" />
+                <span className="font-bold">E-commerce</span>
+              </Link>
+              <button
+                className="p-2 text-muted-foreground"
+                onClick={() => setIsOpen(false)}
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <nav className="flex flex-col space-y-4">
+              <Link
+                href="/shop"
+                className="text-lg font-medium transition-colors hover:text-primary"
+                onClick={() => setIsOpen(false)}
+              >
+                Shop
+              </Link>
+              <Link
+                href="/categories"
+                className="text-lg font-medium transition-colors hover:text-primary"
+                onClick={() => setIsOpen(false)}
+              >
+                Categories
+              </Link>
+              <Link
+                href="/deals"
+                className="text-lg font-medium transition-colors hover:text-primary"
+                onClick={() => setIsOpen(false)}
+              >
+                Deals
+              </Link>
+              <Link
+                href="/about"
+                className="text-lg font-medium transition-colors hover:text-primary"
+                onClick={() => setIsOpen(false)}
+              >
+                About
+              </Link>
+            </nav>
+          </div>
         </div>
       </div>
     </header>

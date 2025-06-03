@@ -19,8 +19,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Copy } from "lucide-react";
 import { toast } from "sonner";
 
 interface Product {
@@ -48,6 +58,9 @@ export default function VendorProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isDuplicating, setIsDuplicating] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -70,21 +83,47 @@ export default function VendorProductsPage() {
     }
   };
 
-  const handleDelete = async (productId: string) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) {
-      return;
-    }
-
-    setIsDeleting(productId);
+  const handleDuplicate = async (productId: string) => {
+    setIsDuplicating(productId);
     try {
-      const response = await fetch(`/api/products/${productId}`, {
+      const response = await fetch(`/api/products/${productId}/duplicate`, {
+        method: "POST",
+      });
+
+      if (response.ok) {
+        const newProduct = await response.json();
+        toast.success("Product duplicated successfully");
+        setProducts((prevProducts) => [...prevProducts, newProduct]);
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to duplicate product");
+      }
+    } catch (error) {
+      console.error("Error duplicating product:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to duplicate product");
+    } finally {
+      setIsDuplicating(null);
+    }
+  };
+
+  const confirmDelete = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!productToDelete) return;
+
+    setIsDeleting(productToDelete._id);
+    try {
+      const response = await fetch(`/api/products/${productToDelete._id}`, {
         method: "DELETE",
       });
 
       if (response.ok) {
         toast.success("Product deleted successfully");
-    setProducts((prevProducts) =>
-          prevProducts.filter((product) => product._id !== productId)
+        setProducts((prevProducts) =>
+          prevProducts.filter((product) => product._id !== productToDelete._id)
         );
       } else {
         const error = await response.json();
@@ -95,6 +134,8 @@ export default function VendorProductsPage() {
       toast.error(error instanceof Error ? error.message : "Failed to delete product");
     } finally {
       setIsDeleting(null);
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
     }
   };
 
@@ -114,11 +155,11 @@ export default function VendorProductsPage() {
           <p className="text-gray-500">Manage your product listings</p>
         </div>
         <Button asChild>
-        <Link href="/vendor/products/new">
+          <Link href="/vendor/products/new">
             <Plus className="mr-2 h-4 w-4" />
             Add Product
           </Link>
-          </Button>
+        </Button>
       </div>
 
       <Card>
@@ -133,27 +174,27 @@ export default function VendorProductsPage() {
             <div className="flex h-[200px] flex-col items-center justify-center space-y-3 text-center">
               <div className="text-sm text-gray-500">
                 You haven&apos;t added any products yet
-          </div>
+              </div>
               <Button asChild variant="outline">
                 <Link href="/vendor/products/new">
                   <Plus className="mr-2 h-4 w-4" />
                   Add Your First Product
                 </Link>
               </Button>
-          </div>
+            </div>
           ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
+            <Table>
+              <TableHeader>
+                <TableRow>
                   <TableHead>Image</TableHead>
                   <TableHead>Product Details</TableHead>
                   <TableHead>Inventory</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Status</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {products.map((product) => (
                   <TableRow key={product._id}>
                     <TableCell>
@@ -167,7 +208,7 @@ export default function VendorProductsPage() {
                         <div className="h-12 w-12 rounded-md bg-gray-100" />
                       )}
                     </TableCell>
-                  <TableCell>
+                    <TableCell>
                       <div className="space-y-1">
                         <p className="font-medium">{product.name}</p>
                         <p className="text-sm text-gray-500">
@@ -196,9 +237,9 @@ export default function VendorProductsPage() {
                             ${product.comparePrice.toFixed(2)}
                           </p>
                         )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       <div className="space-y-1">
                         <Badge
                           variant={product.isPublished ? "default" : "secondary"}
@@ -208,11 +249,11 @@ export default function VendorProductsPage() {
                         {product.isFeatured && (
                           <Badge variant="outline" className="ml-1">
                             Featured
-                    </Badge>
+                          </Badge>
                         )}
                       </div>
-                  </TableCell>
-                  <TableCell>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex space-x-2">
                         <Button
                           variant="ghost"
@@ -226,8 +267,20 @@ export default function VendorProductsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          onClick={() => handleDuplicate(product._id)}
+                          disabled={isDuplicating === product._id}
+                        >
+                          {isDuplicating === product._id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => confirmDelete(product)}
                           disabled={isDeleting === product._id}
-                          onClick={() => handleDelete(product._id)}
                         >
                           {isDeleting === product._id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -236,14 +289,42 @@ export default function VendorProductsPage() {
                           )}
                         </Button>
                       </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the product &quot;{productToDelete?.name}&quot;. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Product"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 

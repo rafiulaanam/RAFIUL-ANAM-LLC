@@ -9,114 +9,74 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Check authentication
     const session = await getServerSession(authOptions);
-
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     const client = await clientPromise;
     const db = client.db();
-    
+
+    // Get vendor details
+    const vendor = await db.collection("users").findOne({
+      email: session.user.email,
+      $or: [
+        { role: "VENDOR" },
+        { role: "vendor" },
+        { role: "Vendor" }
+      ]
+    });
+
+    if (!vendor) {
+      return NextResponse.json(
+        { error: "Vendor not found" },
+        { status: 404 }
+      );
+    }
+
     // Find the original product
-    const originalProduct = await db
-      .collection("products")
-      .findOne({ _id: new ObjectId(params.id) });
+    const originalProduct = await db.collection("products").findOne({
+      _id: new ObjectId(params.id),
+      vendorId: vendor._id
+    });
 
     if (!originalProduct) {
-      return NextResponse.json({
-        success: false,
-        error: "Original product not found"
-      }, { status: 404 });
+      return NextResponse.json(
+        { error: "Product not found" },
+        { status: 404 }
+      );
     }
 
-    // Handle category ID based on product structure
-    const categoryId = originalProduct.category._id || originalProduct.category;
-    
-    // Get category details
-    const category = await db
-      .collection("categories")
-      .findOne({ _id: new ObjectId(categoryId) });
-
-    if (!category) {
-      return NextResponse.json({
-        success: false,
-        error: "Category not found"
-      }, { status: 404 });
-    }
-
-    // Prepare duplicate data
-    const duplicateData = {
+    // Create a duplicate product with modified name and SKU
+    const duplicateProduct = {
+      ...originalProduct,
+      _id: new ObjectId(),
       name: `${originalProduct.name} (Copy)`,
-      description: originalProduct.description,
-      price: originalProduct.price,
-      images: originalProduct.images || [originalProduct.image], // Handle both array and single image
-      category: new ObjectId(categoryId), // Store as ObjectId for consistency
-      brand: originalProduct.brand,
-      inventory: originalProduct.inventory,
-      isActive: originalProduct.isActive,
+      sku: originalProduct.sku ? `${originalProduct.sku}-copy` : undefined,
+      isPublished: false, // Set as draft by default
       createdAt: new Date(),
-      updatedAt: new Date(),
-      createdBy: session.user.id
+      updatedAt: new Date()
     };
 
-    // Insert the new product
-    const result = await db.collection("products").insertOne(duplicateData);
+    // Insert the duplicate product
+    const result = await db.collection("products").insertOne(duplicateProduct);
 
-    // Fetch the created product with populated category
-    const newProduct = await db
-      .collection("products")
-      .aggregate([
-        {
-          $match: { _id: result.insertedId }
-        },
-        {
-          $lookup: {
-            from: "categories",
-            localField: "category",
-            foreignField: "_id",
-            as: "categoryDetails"
-          }
-        },
-        {
-          $unwind: "$categoryDetails"
-        },
-        {
-          $project: {
-            _id: 1,
-            name: 1,
-            description: 1,
-            price: 1,
-            image: { $arrayElemAt: ["$images", 0] },
-            images: 1,
-            brand: 1,
-            inventory: 1,
-            isActive: 1,
-            createdAt: 1,
-            updatedAt: 1,
-            createdBy: 1,
-            category: {
-              _id: "$categoryDetails._id",
-              name: "$categoryDetails.name"
-            }
-          }
-        }
-      ])
-      .next();
-
-    if (!newProduct) {
-      throw new Error("Failed to fetch duplicated product");
-    }
-
+    // Return the new product with string IDs
     return NextResponse.json({
-      success: true,
-      data: newProduct
+      ...duplicateProduct,
+      _id: result.insertedId.toString(),
+      vendorId: duplicateProduct.vendorId.toString(),
+      categoryId: duplicateProduct.categoryId.toString()
     });
-  } catch (error: any) {
-    console.error('Product Duplicate Error:', error);
-    return NextResponse.json({
-      success: false,
-      error: error.message || "Failed to duplicate product"
-    }, { status: 500 });
+  } catch (error) {
+    console.error("Error duplicating product:", error);
+    return NextResponse.json(
+      { error: "Failed to duplicate product" },
+      { status: 500 }
+    );
   }
 } 
