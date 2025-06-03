@@ -249,9 +249,9 @@ export default function OrdersPage() {
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{order.customer.name}</div>
+                      <div className="font-medium">{order.customer?.name || 'N/A'}</div>
                       <div className="text-sm text-muted-foreground">
-                        {order.customer.email}
+                        {order.customer?.email || 'No email'}
                       </div>
                     </div>
                   </TableCell>

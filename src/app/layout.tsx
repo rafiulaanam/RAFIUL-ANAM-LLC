@@ -10,6 +10,7 @@ import { Toaster } from "sonner";
 import { BodyAttributes } from "@/components/providers/body-attributes";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
+import { cn } from "@/lib/utils";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -43,7 +44,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body 
-        className={inter.className}
+        className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}
         suppressHydrationWarning
       >
         <BodyAttributes />

@@ -16,6 +16,7 @@ import {
   CreditCard,
   Truck as ShippingIcon,
   Sliders,
+  ClipboardList,
 } from "lucide-react";
 
 const navigation = [
@@ -23,7 +24,15 @@ const navigation = [
   { name: "Products", href: "/admin/products", icon: Package },
   { name: "Categories", href: "/admin/categories", icon: Tags },
   { name: "Users", href: "/admin/users", icon: Users },
-  { name: "Vendors", href: "/admin/vendors", icon: Store },
+  { 
+    name: "Vendors", 
+    href: "/admin/vendors", 
+    icon: Store,
+    children: [
+      { name: "All Vendors", href: "/admin/vendors", icon: Store },
+      { name: "Vendor Requests", href: "/admin/vendors/requests", icon: ClipboardList },
+    ],
+  },
   { name: "Orders", href: "/admin/orders", icon: Package },
   { name: "Deliveries", href: "/admin/deliveries", icon: Truck },
   { name: "Invoices", href: "/admin/invoices", icon: FileText },

@@ -9,7 +9,7 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { Icons } from "@/components/ui/icons";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { Heart } from "lucide-react";
+import { Heart, Store } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 const Link = React.forwardRef<
@@ -93,6 +93,12 @@ export function ProfileMenu() {
     ? vendorItems 
     : [];
 
+  const vendorApplicationItem = !session.user.role || session.user.role === "USER" 
+    ? [{ href: "/vendor-request", icon: "store", label: "Become a Vendor" }]
+    : [];
+
+  Icons.store = Store;
+
   const MenuItem = React.forwardRef<
     HTMLAnchorElement,
     {
@@ -161,6 +167,13 @@ export function ProfileMenu() {
             <>
               <Divider />
               <MenuGroup items={roleItems} />
+            </>
+          )}
+
+          {vendorApplicationItem.length > 0 && (
+            <>
+              <Divider />
+              <MenuGroup items={vendorApplicationItem} />
             </>
           )}
 

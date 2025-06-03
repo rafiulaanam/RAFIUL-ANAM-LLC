@@ -3,23 +3,27 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/db";
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-
-    if (!session || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.email || session.user.role !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     const client = await clientPromise;
     const db = client.db();
 
-    // Get all users with VENDOR role
+    // Get all vendors with aggregated data
     const vendors = await db
       .collection("users")
       .aggregate([
         {
-          $match: { role: "VENDOR" }
+          $match: {
+            role: "VENDOR"
+          }
         },
         {
           $lookup: {
@@ -59,21 +63,23 @@ export async function GET(request: Request) {
             name: 1,
             email: 1,
             image: 1,
-            storeName: { $ifNull: ["$storeName", ""] },
-            storeDescription: { $ifNull: ["$storeDescription", ""] },
-            isVerified: { $ifNull: ["$isVerified", false] },
-            isActive: { $ifNull: ["$isActive", true] },
+            storeName: 1,
+            storeDescription: 1,
+            isVerified: 1,
+            isActive: 1,
             totalProducts: { $size: "$products" },
             totalOrders: { $size: "$orders" },
             totalRevenue: {
               $sum: "$orders.total"
             },
             joinedAt: "$createdAt",
-            lastLogin: { $ifNull: ["$lastLogin", null] }
+            lastLogin: 1
           }
         },
         {
-          $sort: { joinedAt: -1 }
+          $sort: {
+            createdAt: -1
+          }
         }
       ])
       .toArray();
@@ -82,6 +88,7 @@ export async function GET(request: Request) {
       success: true,
       data: vendors
     });
+
   } catch (error) {
     console.error("Error fetching vendors:", error);
     return NextResponse.json(
