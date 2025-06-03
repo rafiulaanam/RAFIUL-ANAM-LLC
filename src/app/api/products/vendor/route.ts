@@ -5,7 +5,7 @@ import clientPromise from "@/lib/db";
 import { ObjectId } from "mongodb";
 
 // GET vendor's products
-export async function GET() {
+export async function GET(request: Request) {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -15,6 +15,12 @@ export async function GET() {
         { status: 401 }
       );
     }
+
+    // Get pagination parameters from URL
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const skip = (page - 1) * limit;
 
     const client = await clientPromise;
     const db = client.db();
@@ -36,7 +42,13 @@ export async function GET() {
       );
     }
 
-    // Fetch products for this vendor
+    // Get total count of products
+    const total = await db.collection("products").countDocuments({
+      vendorId: vendor._id,
+      deletedAt: { $exists: false }
+    });
+
+    // Fetch paginated products for this vendor
     const products = await db
       .collection("products")
       .find({ 
@@ -44,6 +56,8 @@ export async function GET() {
         deletedAt: { $exists: false } 
       })
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .toArray();
 
     // Transform _id to string for JSON serialization
@@ -54,7 +68,13 @@ export async function GET() {
       categoryId: product.categoryId ? product.categoryId.toString() : null
     }));
 
-    return NextResponse.json(transformedProducts);
+    return NextResponse.json({
+      products: transformedProducts,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      hasMore: skip + limit < total
+    });
   } catch (error) {
     console.error("Error fetching vendor products:", error);
     return NextResponse.json(

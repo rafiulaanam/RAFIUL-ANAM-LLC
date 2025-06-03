@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -29,8 +29,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Pencil, Trash2, Copy } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Copy, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 interface Product {
@@ -53,34 +60,61 @@ interface Product {
   updatedAt: string;
 }
 
+const PAGE_SIZES = [10, 20, 30, 50];
+
 export default function VendorProductsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isDuplicating, setIsDuplicating] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    const page = Number(searchParams.get("page")) || 1;
+    const size = Number(searchParams.get("size")) || 10;
+    setCurrentPage(page);
+    setPageSize(size);
+    fetchProducts(page, size);
+  }, [searchParams]);
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (page: number, size: number) => {
     try {
-      const response = await fetch("/api/products/vendor");
+      const response = await fetch(`/api/products/vendor?page=${page}&limit=${size}`);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to fetch products");
       }
       const data = await response.json();
-      setProducts(data);
+      setProducts(data.products);
+      setTotalProducts(data.total);
     } catch (error) {
       console.error("Error fetching products:", error);
       toast.error(error instanceof Error ? error.message : "Failed to load products");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const totalPages = Math.ceil(totalProducts / pageSize);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", newPage.toString());
+    router.push(`?${params.toString()}`);
+  };
+
+  const handlePageSizeChange = (newSize: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("size", newSize);
+    params.set("page", "1"); // Reset to first page when changing page size
+    router.push(`?${params.toString()}`);
   };
 
   const handleDuplicate = async (productId: string) => {
@@ -164,10 +198,32 @@ export default function VendorProductsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Your Products</CardTitle>
-          <CardDescription>
-            A list of all your products. Click on a product to edit it.
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Your Products</CardTitle>
+              <CardDescription>
+                A list of all your products. Click on a product to edit it.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">Items per page:</p>
+              <Select
+                value={pageSize.toString()}
+                onValueChange={handlePageSizeChange}
+              >
+                <SelectTrigger className="w-[80px]">
+                  <SelectValue placeholder={pageSize} />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZES.map((size) => (
+                    <SelectItem key={size} value={size.toString()}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {products.length === 0 ? (
@@ -183,117 +239,171 @@ export default function VendorProductsPage() {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Image</TableHead>
-                  <TableHead>Product Details</TableHead>
-                  <TableHead>Inventory</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((product) => (
-                  <TableRow key={product._id}>
-                    <TableCell>
-                      {product.images[0] ? (
-                        <img
-                          src={product.images[0]}
-                          alt={product.name}
-                          className="h-12 w-12 rounded-md object-cover"
-                        />
-                      ) : (
-                        <div className="h-12 w-12 rounded-md bg-gray-100" />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {product.description.length > 100
-                            ? `${product.description.slice(0, 100)}...`
-                            : product.description}
-                        </p>
-                        <p className="text-sm text-gray-500">SKU: {product.sku || "N/A"}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <p className="font-medium">{product.stock} in stock</p>
-                        {product.trackInventory && (
-                          <p className="text-sm text-gray-500">
-                            Low stock alert at {product.lowStockThreshold}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <p className="font-medium">${product.price.toFixed(2)}</p>
-                        {product.comparePrice && (
-                          <p className="text-sm text-gray-500 line-through">
-                            ${product.comparePrice.toFixed(2)}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <Badge
-                          variant={product.isPublished ? "default" : "secondary"}
-                        >
-                          {product.isPublished ? "Published" : "Draft"}
-                        </Badge>
-                        {product.isFeatured && (
-                          <Badge variant="outline" className="ml-1">
-                            Featured
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            router.push(`/vendor/products/${product._id}/edit`)
-                          }
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDuplicate(product._id)}
-                          disabled={isDuplicating === product._id}
-                        >
-                          {isDuplicating === product._id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => confirmDelete(product)}
-                          disabled={isDeleting === product._id}
-                        >
-                          {isDeleting === product._id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          )}
-                        </Button>
-                      </div>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Image</TableHead>
+                    <TableHead>Product Details</TableHead>
+                    <TableHead>Inventory</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {products.map((product) => (
+                    <TableRow key={product._id}>
+                      <TableCell>
+                        {product.images[0] ? (
+                          <img
+                            src={product.images[0]}
+                            alt={product.name}
+                            className="h-12 w-12 rounded-md object-cover"
+                          />
+                        ) : (
+                          <div className="h-12 w-12 rounded-md bg-gray-100" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p className="font-medium">{product.name}</p>
+                          <p className="text-sm text-gray-500">
+                            {product.description.length > 100
+                              ? `${product.description.slice(0, 100)}...`
+                              : product.description}
+                          </p>
+                          <p className="text-sm text-gray-500">SKU: {product.sku || "N/A"}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p className="font-medium">{product.stock} in stock</p>
+                          {product.trackInventory && (
+                            <p className="text-sm text-gray-500">
+                              Low stock alert at {product.lowStockThreshold}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <p className="font-medium">${product.price.toFixed(2)}</p>
+                          {product.comparePrice && (
+                            <p className="text-sm text-gray-500 line-through">
+                              ${product.comparePrice.toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Badge
+                            variant={product.isPublished ? "default" : "secondary"}
+                          >
+                            {product.isPublished ? "Published" : "Draft"}
+                          </Badge>
+                          {product.isFeatured && (
+                            <Badge variant="outline" className="ml-1">
+                              Featured
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              router.push(`/vendor/products/${product._id}/edit`)
+                            }
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDuplicate(product._id)}
+                            disabled={isDuplicating === product._id}
+                          >
+                            {isDuplicating === product._id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => confirmDelete(product)}
+                            disabled={isDeleting === product._id}
+                          >
+                            {isDeleting === product._id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              <div className="mt-4 flex items-center justify-between px-2">
+                <div className="text-sm text-muted-foreground">
+                  Showing {Math.min((currentPage - 1) * pageSize + 1, totalProducts)} to{" "}
+                  {Math.min(currentPage * pageSize, totalProducts)} of {totalProducts} products
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => {
+                        // Show first page, last page, current page, and pages around current page
+                        const nearCurrent = Math.abs(page - currentPage) <= 1;
+                        const isFirstPage = page === 1;
+                        const isLastPage = page === totalPages;
+                        return nearCurrent || isFirstPage || isLastPage;
+                      })
+                      .map((page, index, array) => (
+                        <div key={page} className="flex items-center">
+                          {index > 0 && array[index - 1] !== page - 1 && (
+                            <span className="px-2 text-muted-foreground">...</span>
+                          )}
+                          <Button
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handlePageChange(page)}
+                            className="w-8"
+                          >
+                            {page}
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

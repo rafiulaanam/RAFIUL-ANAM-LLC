@@ -19,52 +19,107 @@ interface CustomSession extends Session {
 // GET products with filtering, sorting, and pagination
 export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "12");
+    const category = searchParams.get("category");
+    const brand = searchParams.get("brand");
+    const sort = searchParams.get("sort") || "newest";
+    const search = searchParams.get("q") || "";
+    const minPrice = parseFloat(searchParams.get("minPrice") || "0");
+    const maxPrice = parseFloat(searchParams.get("maxPrice") || "1000");
+
+    const skip = (page - 1) * limit;
+
     const client = await clientPromise;
     const db = client.db();
 
+    // Build query
+    const query: any = {
+      deletedAt: { $exists: false },
+      price: { $gte: minPrice, $lte: maxPrice }
+    };
+
+    if (category) {
+      query.categoryId = new ObjectId(category);
+    }
+
+    if (brand) {
+      query.brand = brand;
+    }
+
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { brand: { $regex: search, $options: "i" } }
+      ];
+    }
+
+    // Build sort
+    let sortQuery: any = {};
+    switch (sort) {
+      case "price-asc":
+        sortQuery.price = 1;
+        break;
+      case "price-desc":
+        sortQuery.price = -1;
+        break;
+      case "rating":
+        sortQuery.rating = -1;
+        break;
+      default: // newest
+        sortQuery.createdAt = -1;
+    }
+
+    // Get total count for pagination
+    const total = await db.collection("products").countDocuments(query);
+
+    // Fetch products with pagination
     const products = await db
       .collection("products")
-      .aggregate([
-        {
-          $lookup: {
-            from: "categories",
-            localField: "category",
-            foreignField: "_id",
-            as: "categoryDetails"
-          }
-        },
-        {
-          $unwind: {
-            path: "$categoryDetails",
-            preserveNullAndEmptyArrays: true
-          }
-        },
-        {
-          $project: {
-            _id: 1,
-            name: 1,
-            description: 1,
-            price: 1,
-            image: { $arrayElemAt: ["$images", 0] }, // Convert images array to single image
-            images: 1, // Keep the original images array
-            brand: 1,
-            inventory: 1,
-            isActive: 1,
-            createdAt: 1,
-            updatedAt: 1,
-            createdBy: 1,
-            category: {
-              _id: "$categoryDetails._id",
-              name: "$categoryDetails.name"
-            }
-          }
-        }
-      ])
+      .find(query)
+      .sort(sortQuery)
+      .skip(skip)
+      .limit(limit)
       .toArray();
 
+    // Transform products
+    const transformedProducts = await Promise.all(
+      products.map(async (product) => {
+        // Get vendor details
+        const vendor = await db.collection("users").findOne(
+          { _id: product.vendorId },
+          { projection: { name: 1 } }
+        );
+
+        // Get category details
+        const category = product.categoryId
+          ? await db.collection("categories").findOne(
+              { _id: product.categoryId },
+              { projection: { name: 1 } }
+            )
+          : null;
+
+        return {
+          ...product,
+          _id: product._id.toString(),
+          vendorId: product.vendorId.toString(),
+          categoryId: product.categoryId?.toString(),
+          vendor: vendor ? { _id: vendor._id.toString(), name: vendor.name } : null,
+          category: category
+            ? { _id: category._id.toString(), name: category.name }
+            : null,
+        };
+      })
+    );
+
     return NextResponse.json({
-      success: true,
-      data: products
+      products: transformedProducts,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      hasMore: skip + limit < total
     });
   } catch (error) {
     console.error("Error fetching products:", error);
