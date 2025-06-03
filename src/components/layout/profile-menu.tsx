@@ -9,6 +9,8 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { Icons } from "@/components/ui/icons";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { Heart } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 const Link = React.forwardRef<
   HTMLAnchorElement,

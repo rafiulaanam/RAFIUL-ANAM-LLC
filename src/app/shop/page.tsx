@@ -14,10 +14,11 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Star, ShoppingCart, Eye, Check, Plus, Minus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Search, Star, ShoppingCart, Eye, Check, Plus, Minus, ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { useInView } from "react-intersection-observer";
 import { useCartStore } from "@/store/useCartStore";
+import { useWishlistStore } from "@/store/useWishlistStore";
 
 interface Product {
   _id: string;
@@ -55,6 +56,10 @@ interface FilterState {
   sort: string;
 }
 
+interface WishlistState {
+  [key: string]: boolean;
+}
+
 const ITEMS_PER_PAGE = 12;
 const PAGE_SIZES = [12, 24, 36, 48];
 
@@ -76,8 +81,10 @@ export default function ShopPage() {
   const [addingToCart, setAddingToCart] = useState<{ [key: string]: boolean }>({});
   const [localQuantities, setLocalQuantities] = useState<{ [key: string]: number }>({});
   const [selectedBrand, setSelectedBrand] = useState("");
+  const [wishlist, setWishlist] = useState<WishlistState>({});
 
   const { cart, addItem, updateQuantity, loading: cartLoading } = useCartStore();
+  const { items: wishlistItems, addItem: addToWishlist, removeItem: removeFromWishlist, loadWishlist, isInWishlist } = useWishlistStore();
 
   useEffect(() => {
     const page = Number(searchParams.get("page")) || 1;
@@ -279,6 +286,25 @@ export default function ShopPage() {
     updateSearchParams({ brand, page: "1" });
   };
 
+  // Load wishlist on mount
+  useEffect(() => {
+    loadWishlist();
+  }, [loadWishlist]);
+
+  // Replace toggleWishlist function
+  const handleWishlistToggle = async (product: Product) => {
+    if (isInWishlist(product._id)) {
+      await removeFromWishlist(product._id);
+    } else {
+      await addToWishlist({
+        productId: product._id,
+        name: product.name,
+        price: product.price,
+        image: product.images[0]
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-[200px] items-center justify-center">
@@ -470,24 +496,104 @@ export default function ShopPage() {
             {/* Products Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {products.map((product) => (
-                <Card key={product._id} className="overflow-hidden">
-                  <div className="relative aspect-square">
+                <Card key={product._id} className="group relative overflow-hidden border-0 bg-white dark:bg-gray-800">
+                  {/* Image Container */}
+                  <div className="relative aspect-[4/3] overflow-hidden">
                     <img
                       src={product.images[0]}
                       alt={product.name}
-                      className="object-cover w-full h-full"
+                      className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
                     />
-                    <div className="absolute top-2 right-2 flex gap-2">
+                    
+                    {/* Discount Badge */}
+                    {product.comparePrice && product.comparePrice > product.price && (
+                      <Badge className="absolute left-2 top-2 bg-red-500">
+                        {Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)}% OFF
+                      </Badge>
+                    )}
+
+                    {/* Quick Action Buttons */}
+                    <div className="absolute right-2 top-2 flex flex-col gap-2">
                       <Button
                         size="icon"
                         variant="secondary"
+                        className="h-8 w-8 bg-white/80 backdrop-blur-sm hover:bg-white dark:bg-gray-800/80 dark:hover:bg-gray-800"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleWishlistToggle(product);
+                        }}
+                      >
+                        <Heart
+                          className={`h-4 w-4 ${
+                            isInWishlist(product._id)
+                              ? "fill-red-500 text-red-500"
+                              : "text-gray-600 dark:text-gray-400"
+                          }`}
+                        />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-8 w-8 bg-white/80 backdrop-blur-sm hover:bg-white dark:bg-gray-800/80 dark:hover:bg-gray-800"
                         onClick={() => router.push(`/products/${product._id}`)}
                       >
-                        <Eye className="h-4 w-4" />
+                        <Eye className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                       </Button>
+                    </div>
+                  </div>
+
+                  {/* Product Info */}
+                  <div className="p-4">
+                    {/* Brand & Rating */}
+                    <div className="flex items-center justify-between mb-2">
+                      {product.brand && (
+                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                          {product.brand}
+                        </span>
+                      )}
+                      {product.rating && (
+                        <div className="flex items-center gap-1">
+                          <div className="flex items-center">
+                            {renderStars(product.rating)}
+                          </div>
+                          {product.reviewCount && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              ({product.reviewCount})
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <h3 
+                      className="font-medium text-gray-900 dark:text-gray-100 mb-1 cursor-pointer hover:text-primary"
+                      onClick={() => router.push(`/products/${product._id}`)}
+                    >
+                      {product.name}
+                    </h3>
+
+                    {/* Description */}
+                    <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">
+                      {product.description}
+                    </p>
+
+                    {/* Price & Cart */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                          ${product.price}
+                        </span>
+                        {product.comparePrice && (
+                          <span className="text-sm text-gray-500 line-through">
+                            ${product.comparePrice}
+                          </span>
+                        )}
+                      </div>
+
                       {getCartDetails(product._id).isInCart ? (
                         <div className="flex items-center gap-2">
-                          <div className="flex items-center border rounded-lg">
+                          <div className="flex items-center border rounded-lg bg-gray-50 dark:bg-gray-700">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -518,61 +624,35 @@ export default function ShopPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <Button
-                            className="flex-1"
-                            onClick={() => handleAddToCart(product)}
-                            disabled={addingToCart[product._id] || cartLoading}
-                          >
-                            {addingToCart[product._id] ? (
-                              <>
-                                <Check className="mr-2 h-4 w-4" />
-                                Added
-                              </>
-                            ) : (
-                              <>
-                                <ShoppingCart className="mr-2 h-4 w-4" />
-                                Add
-                              </>
-                            )}
-                          </Button>
-                          {addingToCart[product._id] && (
-                            <span className="text-sm text-muted-foreground">
-                              Qty: 1
-                            </span>
+                        <Button
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => handleAddToCart(product)}
+                          disabled={addingToCart[product._id] || cartLoading}
+                        >
+                          {addingToCart[product._id] ? (
+                            <>
+                              <Check className="h-4 w-4" />
+                              Added
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart className="h-4 w-4" />
+                              Add
+                            </>
                           )}
-                        </div>
+                        </Button>
                       )}
                     </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold">{product.name}</h3>
-                    <p className="mt-1 text-sm text-gray-500 line-clamp-2">
-                      {product.description}
-                    </p>
-                    <div className="mt-2 flex items-center space-x-1">
-                      {renderStars(product.rating)}
-                      {product.reviewCount && (
-                        <span className="text-sm text-gray-500">
-                          ({product.reviewCount})
+
+                    {/* Vendor */}
+                    {product.vendor?.name && (
+                      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Sold by: {product.vendor.name}
                         </span>
-                      )}
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <div>
-                        <span className="text-lg font-bold">${product.price}</span>
-                        {product.comparePrice && (
-                          <span className="ml-2 text-sm text-gray-500 line-through">
-                            ${product.comparePrice}
-                          </span>
-                        )}
                       </div>
-                      {product.vendor?.name && (
-                        <span className="text-sm text-gray-500">
-                          {product.vendor.name}
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </Card>
               ))}

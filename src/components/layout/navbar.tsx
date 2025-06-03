@@ -1,20 +1,39 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useShoppingCart } from "@/hooks/useShoppingCart";
+import { useCartStore } from "@/store/useCartStore";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileMenu } from "@/components/layout/profile-menu";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+
+const navigation = [
+  { name: "Shop", href: "/shop" },
+  { name: "Categories", href: "/categories" },
+  { name: "Featured", href: "/featured" },
+  { name: "New Arrivals", href: "/new-arrivals" },
+];
 
 export default function Navbar() {
   const { data: session } = useSession();
-  const { cart, isLoading, itemCount } = useShoppingCart();
+  const { cart, loading: cartLoading, loadCart } = useCartStore();
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Calculate total quantity
+  const totalQuantity = cart?.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+
+  // Load cart on mount
+  useEffect(() => {
+    loadCart();
+  }, [loadCart]);
+
+  const isActive = (path: string) => pathname === path;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -27,25 +46,26 @@ export default function Navbar() {
               <span className="font-bold">E-commerce</span>
             </Link>
             <nav className="flex items-center space-x-4 lg:space-x-6">
-              <Link href="/shop" className="text-sm font-medium transition-colors hover:text-primary">
-                Shop
-              </Link>
-              <Link href="/categories" className="text-sm font-medium transition-colors hover:text-primary">
-                Categories
-              </Link>
-              <Link href="/deals" className="text-sm font-medium transition-colors hover:text-primary">
-                Deals
-              </Link>
-              <Link href="/about" className="text-sm font-medium transition-colors hover:text-primary">
-                About
-              </Link>
+              {navigation.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`text-sm font-medium transition-colors hover:text-primary ${
+                    isActive(item.href)
+                      ? "text-primary"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {item.name}
+                </Link>
+              ))}
             </nav>
           </div>
 
           {/* Mobile Logo */}
           <div className="md:hidden flex items-center">
             <button
-              className="p-2 -ml-3 text-muted-foreground"
+              className="p-2 -ml-3 text-muted-foreground hover:text-foreground"
               onClick={() => setIsOpen(!isOpen)}
             >
               <Icons.menu className="h-6 w-6" />
@@ -57,14 +77,17 @@ export default function Navbar() {
 
           {/* Right Section */}
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="icon" className="relative">
-              <Icons.cart className="h-5 w-5" />
-              {!isLoading && itemCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground flex items-center justify-center">
-                  {itemCount}
-                </span>
-              )}
-            </Button>
+            <ThemeToggle />
+            <Link href="/cart">
+              <Button variant="ghost" size="icon" className="relative">
+                <Icons.cart className="h-5 w-5" />
+                {!cartLoading && totalQuantity > 0 && (
+                  <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-primary text-[11px] font-medium text-primary-foreground flex items-center justify-center ring-2 ring-background">
+                    {totalQuantity > 99 ? "99+" : totalQuantity}
+                  </span>
+                )}
+              </Button>
+            </Link>
             <ProfileMenu />
           </div>
         </div>
@@ -82,41 +105,27 @@ export default function Navbar() {
                 <span className="font-bold">E-commerce</span>
               </Link>
               <button
-                className="p-2 text-muted-foreground"
+                className="p-2 text-muted-foreground hover:text-foreground"
                 onClick={() => setIsOpen(false)}
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
             <nav className="flex flex-col space-y-4">
-              <Link
-                href="/shop"
-                className="text-lg font-medium transition-colors hover:text-primary"
-                onClick={() => setIsOpen(false)}
-              >
-                Shop
-              </Link>
-              <Link
-                href="/categories"
-                className="text-lg font-medium transition-colors hover:text-primary"
-                onClick={() => setIsOpen(false)}
-              >
-                Categories
-              </Link>
-              <Link
-                href="/deals"
-                className="text-lg font-medium transition-colors hover:text-primary"
-                onClick={() => setIsOpen(false)}
-              >
-                Deals
-              </Link>
-              <Link
-                href="/about"
-                className="text-lg font-medium transition-colors hover:text-primary"
-                onClick={() => setIsOpen(false)}
-              >
-                About
-              </Link>
+              {navigation.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`text-lg font-medium transition-colors hover:text-primary ${
+                    isActive(item.href)
+                      ? "text-primary"
+                      : "text-muted-foreground"
+                  }`}
+                  onClick={() => setIsOpen(false)}
+                >
+                  {item.name}
+                </Link>
+              ))}
             </nav>
           </div>
         </div>
