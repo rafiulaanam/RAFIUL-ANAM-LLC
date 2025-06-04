@@ -42,12 +42,12 @@ export default function Navbar() {
           {/* Desktop Logo & Navigation */}
           <div className="hidden md:flex items-center space-x-6">
             <Link href="/" className="flex items-center space-x-2">
-              <Icons.logo className="h-6 w-6" />
+            <Icons.logo className="h-6 w-6" />
               <span className="font-bold">E-commerce</span>
             </Link>
             <nav className="flex items-center space-x-4 lg:space-x-6">
               {navigation.map((item) => (
-                <Link
+            <Link 
                   key={item.href}
                   href={item.href}
                   className={`text-sm font-medium transition-colors hover:text-primary ${
@@ -57,12 +57,12 @@ export default function Navbar() {
                   }`}
                 >
                   {item.name}
-                </Link>
+            </Link>
               ))}
-            </nav>
-          </div>
+          </nav>
+        </div>
 
-          {/* Mobile Logo */}
+        {/* Mobile Logo */}
           <div className="md:hidden flex items-center">
             <button
               className="p-2 -ml-3 text-muted-foreground hover:text-foreground"
@@ -72,22 +72,22 @@ export default function Navbar() {
             </button>
             <Link href="/" className="ml-2 font-bold text-lg">
               E-commerce
-            </Link>
-          </div>
+          </Link>
+        </div>
 
-          {/* Right Section */}
+        {/* Right Section */}
           <div className="flex items-center space-x-4">
             <ThemeToggle />
-            <Link href="/cart">
+              <Link href="/cart">
               <Button variant="ghost" size="icon" className="relative">
-                <Icons.cart className="h-5 w-5" />
+                  <Icons.cart className="h-5 w-5" />
                 {!cartLoading && totalQuantity > 0 && (
                   <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-primary text-[11px] font-medium text-primary-foreground flex items-center justify-center ring-2 ring-background">
                     {totalQuantity > 99 ? "99+" : totalQuantity}
-                  </span>
-                )}
-              </Button>
-            </Link>
+                    </span>
+                  )}
+                </Button>
+              </Link>
             <ProfileMenu />
           </div>
         </div>
@@ -126,7 +126,7 @@ export default function Navbar() {
                   {item.name}
                 </Link>
               ))}
-            </nav>
+          </nav>
           </div>
         </div>
       </div>

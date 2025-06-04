@@ -1,111 +1,159 @@
+"use client";
+
+import { motion } from "framer-motion";
 import Image from "next/image";
-import { Github, Linkedin, Twitter } from "lucide-react";
+import { Linkedin, Twitter, Mail } from "lucide-react";
 
 const team = [
   {
-    name: "John Smith",
+    name: "David Anderson",
     role: "CEO & Founder",
-    image: "/images/man.png",
-    bio: "With over 15 years of experience in e-commerce and retail innovation.",
+    image: "/team/david.jpg",
+    bio: "With over 15 years of experience in e-commerce, David leads our company's vision and strategy.",
     social: {
-      twitter: "https://twitter.com/johnsmith",
-      linkedin: "https://linkedin.com/in/johnsmith",
-      github: "https://github.com/johnsmith",
+      linkedin: "#",
+      twitter: "#",
+      email: "david@example.com",
     },
   },
   {
-    name: "Sarah Johnson",
-    role: "Head of Design",
-    image: "/images/man.png",
-    bio: "Leading our design team with a passion for creating beautiful user experiences.",
+    name: "Jessica Zhang",
+    role: "Head of Operations",
+    image: "/team/jessica.jpg",
+    bio: "Jessica ensures smooth operations and exceptional customer experience across all our services.",
     social: {
-      twitter: "https://twitter.com/sarahjohnson",
-      linkedin: "https://linkedin.com/in/sarahjohnson",
-      github: "https://github.com/sarahjohnson",
+      linkedin: "#",
+      twitter: "#",
+      email: "jessica@example.com",
     },
   },
   {
-    name: "Michael Chen",
-    role: "CTO",
-    image: "/images/man.png",
-    bio: "Tech visionary with a track record of building scalable e-commerce platforms.",
+    name: "Marcus Brown",
+    role: "Tech Lead",
+    image: "/team/marcus.jpg",
+    bio: "Marcus oversees our technical infrastructure and drives innovation in our digital platforms.",
     social: {
-      twitter: "https://twitter.com/michaelchen",
-      linkedin: "https://linkedin.com/in/michaelchen",
-      github: "https://github.com/michaelchen",
+      linkedin: "#",
+      twitter: "#",
+      email: "marcus@example.com",
     },
   },
   {
-    name: "Emma Davis",
-    role: "Head of Marketing",
-    image: "/images/man.png",
-    bio: "Digital marketing expert specializing in e-commerce growth strategies.",
+    name: "Sophie Carter",
+    role: "Customer Success",
+    image: "/team/sophie.jpg",
+    bio: "Sophie leads our customer success team, ensuring client satisfaction at every touchpoint.",
     social: {
-      twitter: "https://twitter.com/emmadavis",
-      linkedin: "https://linkedin.com/in/emmadavis",
-      github: "https://github.com/emmadavis",
+      linkedin: "#",
+      twitter: "#",
+      email: "sophie@example.com",
     },
   },
 ];
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.2,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut",
+    },
+  },
+};
+
 export default function Team() {
   return (
-    <section className="py-20 bg-white dark:bg-gray-900">
+    <section className="py-24 bg-white">
       <div className="container mx-auto px-4">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Meet Our Team
           </h2>
-          <p className="text-lg text-muted-foreground">
-            The passionate individuals behind our success, working together to bring you the best shopping experience.
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Get to know the dedicated professionals working behind the scenes to bring you the best shopping experience.
           </p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {team.map((member) => (
-            <div
-              key={member.name}
-              className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 text-center"
+        </motion.div>
+
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
+        >
+          {team.map((member, index) => (
+            <motion.div
+              key={index}
+              variants={itemVariants}
+              className="group"
             >
-              <div className="relative h-40 w-40 mx-auto mb-6">
-                <Image
-                  src={member.image}
-                  alt={member.name}
-                  fill
-                  className="object-cover rounded-full"
-                />
+              <div className="bg-gray-50 rounded-xl p-6 relative">
+                <div className="relative w-full aspect-square mb-6 rounded-lg overflow-hidden">
+                  <Image
+                    src={member.image}
+                    alt={member.name}
+                    fill
+                    className="object-cover transform group-hover:scale-110 transition-transform duration-500"
+                  />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-xl font-semibold mb-1">
+                    {member.name}
+                  </h3>
+                  <p className="text-primary font-medium mb-3">
+                    {member.role}
+                  </p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {member.bio}
+                  </p>
+                  <div className="flex items-center justify-center gap-4">
+                    <a
+                      href={member.social.linkedin}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Linkedin className="w-5 h-5" />
+                    </a>
+                    <a
+                      href={member.social.twitter}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Twitter className="w-5 h-5" />
+                    </a>
+                    <a
+                      href={`mailto:${member.social.email}`}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <Mail className="w-5 h-5" />
+                    </a>
+                  </div>
+                </div>
+                <div className="absolute inset-0 border-2 border-primary/10 rounded-xl -z-10 transform rotate-2 group-hover:rotate-0 transition-transform duration-300" />
               </div>
-              <h3 className="text-xl font-semibold mb-1">{member.name}</h3>
-              <p className="text-primary font-medium mb-3">{member.role}</p>
-              <p className="text-muted-foreground text-sm mb-4">{member.bio}</p>
-              <div className="flex justify-center gap-4">
-                <a
-                  href={member.social.twitter}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <Twitter className="h-5 w-5" />
-                </a>
-                <a
-                  href={member.social.linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <Linkedin className="h-5 w-5" />
-                </a>
-                <a
-                  href={member.social.github}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <Github className="h-5 w-5" />
-                </a>
-              </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );

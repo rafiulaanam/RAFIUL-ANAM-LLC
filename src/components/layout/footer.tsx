@@ -142,7 +142,7 @@ export default function Footer() {
               <Link
                 href="/terms"
                 className="text-sm text-muted-foreground hover:text-primary transition-colors"
-              >
+            >
                 Terms of Service
               </Link>
             </div>

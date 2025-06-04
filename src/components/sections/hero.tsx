@@ -101,17 +101,17 @@ export default function Hero() {
               <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight">
                 Discover Our
                 <span className="text-primary block mt-2">Premium Selection</span>
-              </h1>
+            </h1>
               
               <p className="text-lg sm:text-xl text-muted-foreground max-w-lg">
                 Explore our curated collection of premium products. Quality meets style in every piece.
-              </p>
+            </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
               <Button size="lg" className="group" asChild>
                 <Link href="/shop">
-                  Shop Now
+                Shop Now
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
@@ -147,14 +147,14 @@ export default function Hero() {
                     <Star
                       key={star}
                       className="w-4 h-4 fill-primary text-primary"
-                    />
-                  ))}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Trusted by <span className="font-semibold">10,000+</span> customers
-                </p>
+                  />
+                ))}
               </div>
+              <p className="text-sm text-muted-foreground">
+                Trusted by <span className="font-semibold">10,000+</span> customers
+              </p>
             </div>
+          </div>
           </motion.div>
 
           {/* Right Column - Featured Products */}
@@ -176,14 +176,14 @@ export default function Hero() {
                 transition={{ duration: 0.5 }}
               >
                 <div className="relative h-full w-full">
-                  <Image
+            <Image
                     src={product.images[0]}
                     alt={product.name}
-                    fill
-                    className="object-cover rounded-2xl"
+              fill
+              className="object-cover rounded-2xl"
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 40vw"
                     priority={index === 0}
-                  />
+            />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-2xl" />
                   <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                     <h3 className="text-xl font-semibold mb-2">{product.name}</h3>
@@ -203,8 +203,8 @@ export default function Hero() {
                         Shop Now
                       </Button>
                     </div>
-                  </div>
-                </div>
+          </div>
+        </div>
               </motion.div>
             ))}
 

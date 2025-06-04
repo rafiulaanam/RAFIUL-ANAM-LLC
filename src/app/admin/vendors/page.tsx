@@ -71,7 +71,7 @@ export default function VendorsPage() {
     if (session?.user?.role !== "ADMIN") {
       router.push("/dashboard");
     } else {
-      fetchVendors();
+    fetchVendors();
     }
   }, [session, router]);
 
@@ -198,14 +198,14 @@ export default function VendorsPage() {
               <CardDescription>
                 Manage and monitor vendor accounts
               </CardDescription>
-            </div>
-            <Input
-              placeholder="Search vendors..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+      </div>
+          <Input
+            placeholder="Search vendors..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
               className="max-w-xs"
-            />
-          </div>
+          />
+        </div>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -223,21 +223,21 @@ export default function VendorsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredVendors.map((vendor) => (
+        {filteredVendors.map((vendor) => (
                   <TableRow key={vendor._id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar>
                           <AvatarImage src={vendor.image} />
                           <AvatarFallback>{getInitials(vendor.name)}</AvatarFallback>
-                        </Avatar>
+                  </Avatar>
                         <div className="flex flex-col">
                           <span className="font-medium">{vendor.name}</span>
                           <span className="text-sm text-muted-foreground">
                             {vendor.email}
                           </span>
-                        </div>
-                      </div>
+                  </div>
+                </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
@@ -250,36 +250,36 @@ export default function VendorsPage() {
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <Badge variant={vendor.isActive ? "default" : "secondary"}>
-                          {vendor.isActive ? "Active" : "Inactive"}
-                        </Badge>
+                  {vendor.isActive ? "Active" : "Inactive"}
+                </Badge>
                         <Badge variant={vendor.isVerified ? "success" : "warning"}>
                           {vendor.isVerified ? "Verified" : "Unverified"}
                         </Badge>
-                      </div>
+              </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        {vendor.totalProducts}
-                      </div>
+                      <Package className="h-4 w-4" />
+                      {vendor.totalProducts}
+                  </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <ShoppingCart className="h-4 w-4" />
-                        {vendor.totalOrders}
-                      </div>
+                      <ShoppingCart className="h-4 w-4" />
+                      {vendor.totalOrders}
+                  </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
+                    <DollarSign className="h-4 w-4" />
                         {formatCurrency(vendor.totalRevenue)}
-                      </div>
+                </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
+                  <Calendar className="h-4 w-4" />
                         {new Date(vendor.joinedAt).toLocaleDateString()}
-                      </div>
+                </div>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -328,9 +328,9 @@ export default function VendorsPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        </CardContent>
-      </Card>
+              </div>
+            </CardContent>
+          </Card>
     </div>
   );
 } 

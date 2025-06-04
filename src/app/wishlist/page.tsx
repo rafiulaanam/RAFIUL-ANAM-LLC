@@ -51,12 +51,12 @@ export default function WishlistPage() {
   if (items.length === 0) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
+          <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Your Wishlist</h1>
           <p className="text-muted-foreground mb-4">Your wishlist is empty</p>
-          <Link href="/shop">
+            <Link href="/shop">
             <Button>Continue Shopping</Button>
-          </Link>
+            </Link>
         </div>
       </div>
     );
@@ -78,18 +78,18 @@ export default function WishlistPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {items.map((item) => (
-          <div
+            <div
             key={item.productId}
             className="bg-card rounded-lg shadow-sm overflow-hidden border"
-          >
+            >
             <div className="relative aspect-square">
-              <Image
+                  <Image
                 src={item.image}
                 alt={item.name}
-                fill
+                    fill
                 className="object-cover"
-              />
-            </div>
+                  />
+                </div>
             <div className="p-4">
               <h3 className="font-semibold mb-2 line-clamp-2">{item.name}</h3>
               <p className="text-lg font-bold mb-4">{formatPrice(item.price)}</p>
@@ -102,22 +102,22 @@ export default function WishlistPage() {
                   <ShoppingCart className="h-4 w-4" />
                   Add to Cart
                 </Button>
-                <Button
+                  <Button
                   variant="destructive"
-                  size="icon"
+                    size="icon"
                   disabled={loadingItems.has(item.productId)}
                   onClick={() => removeItem(item.productId)}
-                >
+                  >
                   {loadingItems.has(item.productId) ? (
                     <Icons.spinner className="h-4 w-4 animate-spin" />
                   ) : (
                     <Trash2 className="h-4 w-4" />
-                  )}
-                </Button>
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
       </div>
     </div>
   );

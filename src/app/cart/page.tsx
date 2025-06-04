@@ -44,7 +44,7 @@ export default function CartPage() {
     try {
       setUpdatingItems(prev => new Set(prev).add(productId));
       setLocalQuantities(prev => ({ ...prev, [productId]: newQuantity }));
-      await updateQuantity(productId, newQuantity);
+    await updateQuantity(productId, newQuantity);
     } catch (error) {
       console.error('Error updating quantity:', error);
       // Revert local quantity on error
@@ -80,7 +80,7 @@ export default function CartPage() {
         toast.success("Item quantity reduced");
       } else {
         // If quantity is 1, remove the item
-        await removeItem(productId);
+    await removeItem(productId);
         // Remove from local quantities
         setLocalQuantities(prev => {
           const next = { ...prev };
@@ -192,18 +192,18 @@ export default function CartPage() {
               key={item.productId}
               className="flex gap-4 bg-card rounded-lg p-4 border relative"
             >
-              {/* Product Image */}
+                {/* Product Image */}
               <div className="relative h-24 w-24 rounded-md overflow-hidden">
-                <Image
-                  src={item.image}
-                  alt={item.name}
-                  fill
-                  className="object-cover"
-                />
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    fill
+                    className="object-cover"
+                  />
               </div>
 
-              {/* Product Details */}
-              <div className="flex-1 min-w-0">
+                {/* Product Details */}
+                <div className="flex-1 min-w-0">
                 <h3 className="font-medium line-clamp-2">{item.name}</h3>
                 <div className="mt-1 space-y-1">
                   <p className="text-lg font-bold">{formatPrice(item.price)}</p>
@@ -211,11 +211,11 @@ export default function CartPage() {
                     Subtotal: {formatPrice(getItemSubtotal(item.price, item.productId))}
                   </p>
                 </div>
-                {item.stock !== undefined && item.stock <= 5 && (
-                  <p className="text-sm text-red-500 mt-1">
-                    Only {item.stock} left in stock
-                  </p>
-                )}
+                  {item.stock !== undefined && item.stock <= 5 && (
+                    <p className="text-sm text-red-500 mt-1">
+                      Only {item.stock} left in stock
+                    </p>
+                  )}
 
                 {/* Quantity Controls */}
                 <div className="flex items-center gap-4 mt-4">

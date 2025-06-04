@@ -1,69 +1,109 @@
 "use client";
 
-import { useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mail } from "lucide-react";
+import { Mail, ArrowRight, Gift } from "lucide-react";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.2,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut",
+    },
+  },
+};
+
+const benefits = [
+  {
+    icon: Gift,
+    text: "Exclusive discounts and offers",
+  },
+  {
+    icon: Mail,
+    text: "New product announcements",
+  },
+  {
+    icon: ArrowRight,
+    text: "Early access to sales",
+  },
+];
 
 export default function Newsletter() {
-  const [email, setEmail] = useState("");
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    // TODO: Implement newsletter subscription logic
-    console.log("Subscribing email:", email);
-    setEmail("");
-  };
-
   return (
-    <section className="py-20 bg-primary text-white">
+    <section className="py-24 bg-primary/5">
       <div className="container mx-auto px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/10 mb-6">
-            <Mail className="h-6 w-6" />
-          </div>
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
-            Stay Updated with Our Newsletter
-          </h2>
-          <p className="text-lg text-white/80 mb-8 max-w-2xl mx-auto">
-            Subscribe to our newsletter and get exclusive deals, new product announcements, and shopping tips delivered to your inbox.
-          </p>
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4 max-w-xl mx-auto">
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/60"
-            />
-            <Button
-              type="submit"
-              variant="secondary"
-              size="lg"
-              className="whitespace-nowrap"
-            >
-              Subscribe Now
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="max-w-3xl mx-auto text-center"
+        >
+          <motion.div variants={itemVariants}>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Stay in the Loop
+            </h2>
+            <p className="text-lg text-muted-foreground mb-8">
+              Subscribe to our newsletter and be the first to know about new products,
+              exclusive offers, and shopping tips.
+            </p>
+          </motion.div>
+
+          <motion.form
+            variants={itemVariants}
+            className="flex flex-col sm:flex-row gap-4 mb-8"
+            onSubmit={(e) => e.preventDefault()}
+          >
+            <div className="flex-1">
+              <Input
+                type="email"
+                placeholder="Enter your email"
+                className="w-full h-12"
+              />
+            </div>
+            <Button size="lg" className="w-full sm:w-auto">
+              Subscribe
+              <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
-          </form>
-          <p className="text-sm text-white/60 mt-4">
-            By subscribing, you agree to our Privacy Policy and consent to receive updates from our company.
-          </p>
-          <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="text-2xl font-bold mb-2">Daily Updates</div>
-              <p className="text-white/80">Get the latest product updates and offers</p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold mb-2">Exclusive Offers</div>
-              <p className="text-white/80">Subscriber-only discounts and deals</p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold mb-2">No Spam</div>
-              <p className="text-white/80">We respect your inbox and privacy</p>
-            </div>
-          </div>
-        </div>
+          </motion.form>
+
+          <motion.div
+            variants={itemVariants}
+            className="grid grid-cols-1 sm:grid-cols-3 gap-6"
+          >
+            {benefits.map((benefit, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
+              >
+                <benefit.icon className="w-4 h-4 text-primary" />
+                <span>{benefit.text}</span>
+              </div>
+            ))}
+          </motion.div>
+
+          <motion.p
+            variants={itemVariants}
+            className="text-xs text-muted-foreground mt-6"
+          >
+            By subscribing, you agree to our Privacy Policy and consent to receive updates
+            from our company.
+          </motion.p>
+        </motion.div>
       </div>
     </section>
   );

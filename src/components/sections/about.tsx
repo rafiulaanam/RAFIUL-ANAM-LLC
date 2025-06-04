@@ -1,62 +1,111 @@
+"use client";
+
+import { motion } from "framer-motion";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
-const values = [
-  "Customer satisfaction is our top priority",
-  "Quality products at competitive prices",
-  "Fast and reliable shipping worldwide",
-  "24/7 customer support",
+const highlights = [
+  "10+ Years of Excellence",
+  "100,000+ Happy Customers",
+  "Premium Quality Products",
+  "Fast & Reliable Service",
+  "Secure Shopping Experience",
+  "24/7 Customer Support",
 ];
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { x: -20, opacity: 0 },
+  visible: {
+    x: 0,
+    opacity: 1,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut",
+    },
+  },
+};
 
 export default function About() {
   return (
-    <section className="py-20 bg-gray-50 dark:bg-gray-800">
+    <section className="py-24 bg-white overflow-hidden">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div className="relative h-[500px] rounded-2xl overflow-hidden">
-            <Image
-              src="/images/image.png"
-              alt="About Our Company"
-              fill
-              className="object-cover"
-            />
-          </div>
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
-                About Our Company
-              </h2>
-              <p className="text-lg text-muted-foreground mb-6">
-                We started with a simple mission: to provide high-quality products
-                at affordable prices while delivering exceptional customer service.
-              </p>
-              <p className="text-lg text-muted-foreground">
-                Today, we're proud to serve millions of customers worldwide,
-                offering a curated selection of premium products across various
-                categories.
-              </p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="relative"
+          >
+            <div className="relative aspect-[4/3] rounded-2xl overflow-hidden">
+              <Image
+                src="/about/store-front.jpg"
+                alt="Our Store"
+                fill
+                className="object-cover"
+                priority
+              />
             </div>
-            <ul className="space-y-4">
-              {values.map((value, index) => (
-                <li key={index} className="flex items-center gap-3">
-                  <CheckCircle className="h-6 w-6 text-primary" />
-                  <span>{value}</span>
-                </li>
+            <div className="absolute -bottom-8 -right-8 w-2/3 aspect-video rounded-2xl overflow-hidden border-8 border-white shadow-xl">
+              <Image
+                src="/about/team.jpg"
+                alt="Our Team"
+                fill
+                className="object-cover"
+              />
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">
+              Your Trusted Shopping Destination Since 2014
+            </h2>
+            <p className="text-lg text-muted-foreground mb-8">
+              We started with a simple mission: to make quality products accessible to everyone. 
+              Today, we're proud to serve millions of customers worldwide, offering a curated 
+              selection of premium products at competitive prices.
+            </p>
+
+            <motion.ul
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8"
+            >
+              {highlights.map((highlight, index) => (
+                <motion.li
+                  key={index}
+                  variants={itemVariants}
+                  className="flex items-center gap-2"
+                >
+                  <CheckCircle2 className="w-5 h-5 text-primary" />
+                  <span>{highlight}</span>
+                </motion.li>
               ))}
-            </ul>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-              <div className="text-center p-4 bg-white dark:bg-gray-900 rounded-lg">
-                <div className="text-3xl font-bold text-primary mb-2">1M+</div>
-                <div className="text-sm text-muted-foreground">Happy Customers</div>
-              </div>
-              <div className="text-center p-4 bg-white dark:bg-gray-900 rounded-lg">
-                <div className="text-3xl font-bold text-primary mb-2">50+</div>
-                <div className="text-sm text-muted-foreground">Countries Served</div>
-              </div>
+            </motion.ul>
+
+            <div className="flex flex-wrap gap-4">
+              <Button size="lg">Learn More</Button>
+              <Button size="lg" variant="outline">Contact Us</Button>
             </div>
-            <Button size="lg">Learn More About Us</Button>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>
