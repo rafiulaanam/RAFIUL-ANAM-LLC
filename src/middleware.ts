@@ -1,31 +1,45 @@
-import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { NextRequestWithAuth } from "next-auth/middleware";
 
-export default withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token;
-    const isVendorRoute = req.nextUrl.pathname.startsWith("/vendor");
+export default async function middleware(request: NextRequestWithAuth) {
+  const token = await getToken({ req: request });
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
+  const isVendorRoute = request.nextUrl.pathname.startsWith("/vendor");
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api");
 
-    // Check if user is trying to access vendor routes
-    if (isVendorRoute) {
-      if (!token?.role || token.role !== "VENDOR") {
-        // Redirect non-vendors to home page
-        return NextResponse.redirect(new URL("/", req.url));
-      }
+  // Handle authentication
+  if (!token) {
+    if (isApiRoute) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    return NextResponse.next();
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => !!token, // Ensure user is authenticated
-    },
+    return NextResponse.redirect(new URL("/login", request.url));
   }
-);
 
-// Protect all vendor routes
+  // Handle authorization
+  if (isAdminRoute && token.role !== "ADMIN") {
+    if (isApiRoute) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  if (isVendorRoute && token.role !== "VENDOR") {
+    if (isApiRoute) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  return NextResponse.next();
+}
+
 export const config = {
   matcher: [
-    "/vendor/:path*", // Protect all routes under /vendor
+    "/admin/:path*",
+    "/vendor/:path*",
+    "/api/products/:path*",
+    "/api/categories/:path*",
+    "/api/vendors/:path*",
   ],
 }; 

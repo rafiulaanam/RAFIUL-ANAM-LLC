@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/store/useCartStore";
 import { Check, Loader2, Minus, Plus, ShoppingCart } from "lucide-react";
 
-interface AddToCartProps {
+interface QuantityAddToCartProps {
   product: {
     productId: string;
     name: string;
@@ -16,7 +16,7 @@ interface AddToCartProps {
   className?: string;
 }
 
-export function AddToCart({ product, className = "" }: AddToCartProps) {
+export function QuantityAddToCart({ product, className = "" }: QuantityAddToCartProps) {
   const { cart, initialized, loadCart, addItem, updateQuantity } = useCartStore();
   const [loading, setLoading] = useState(false);
 

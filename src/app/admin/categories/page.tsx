@@ -8,10 +8,11 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ImagePlus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import {
   AlertDialog,
@@ -23,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import ImageUpload from "@/components/ui/image-upload";
 
 interface Category {
   _id: string;
@@ -30,6 +32,8 @@ interface Category {
   slug: string;
   description?: string;
   isActive: boolean;
+  image?: string;
+  status: "active" | "inactive";
 }
 
 export default function CategoriesPage() {
@@ -41,8 +45,16 @@ export default function CategoriesPage() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
+    image: "",
+    status: "active" as "active" | "inactive",
   });
   const { toast } = useToast();
+  const [productsUsingCategory, setProductsUsingCategory] = useState<Array<{
+    _id: string;
+    name: string;
+    status: string;
+    isPublished: boolean;
+  }>>([]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -90,7 +102,7 @@ export default function CategoriesPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || (selectedCategory ? "Failed to update category" : "Failed to create category"));
+        throw new Error(errorData.error || (selectedCategory ? "Failed to update category" : "Failed to create category"));
       }
 
       const data = await response.json();
@@ -104,7 +116,7 @@ export default function CategoriesPage() {
       }
       
       setIsOpen(false);
-      setFormData({ name: "", description: "" });
+      setFormData({ name: "", description: "", image: "", status: "active" });
       setSelectedCategory(null);
       
       toast({
@@ -128,23 +140,57 @@ export default function CategoriesPage() {
     setFormData({
       name: category.name,
       description: category.description || "",
+      image: category.image || "",
+      status: category.status || "active",
     });
     setIsOpen(true);
   };
 
+  const checkProductsUsingCategory = async (categoryId: string) => {
+    try {
+      const response = await fetch(
+        `/api/admin/categories?checkProducts=true&categoryId=${encodeURIComponent(categoryId)}`
+      );
+      const data = await response.json();
+      if (response.ok && data.productsUsingCategory) {
+        setProductsUsingCategory(data.productsUsingCategory);
+        return data.productsUsingCategory.length > 0;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error checking products:", error);
+      return false;
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/categories?id=${id}`, {
+      // First check if category has products
+      const hasProducts = await checkProductsUsingCategory(id);
+      if (hasProducts) {
+        toast({
+          title: "Cannot Delete Category",
+          description: "This category is being used by products. Please see the list of products below.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        return;
+      }
+
+      const encodedId = encodeURIComponent(id);
+      const response = await fetch(`/api/admin/categories?id=${encodedId}`, {
         method: "DELETE",
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to delete category");
+        throw new Error(data.error || "Failed to delete category");
       }
 
       setCategories(categories.filter((cat) => cat._id !== id));
       setIsDeleteDialogOpen(false);
+      setProductsUsingCategory([]);
       
       toast({
         title: "Success",
@@ -160,6 +206,65 @@ export default function CategoriesPage() {
     }
   };
 
+  // Update the DeleteConfirmationDialog component
+  const DeleteConfirmationDialog = ({ category, isOpen, onClose }: { 
+    category: Category; 
+    isOpen: boolean; 
+    onClose: () => void;
+  }) => (
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
+      <AlertDialogContent className="max-w-2xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Category</AlertDialogTitle>
+          <AlertDialogDescription className="space-y-4">
+            <p>
+              Are you sure you want to delete the category "{category?.name}"? This action cannot be undone.
+            </p>
+            
+            {productsUsingCategory.length > 0 && (
+              <div className="mt-4">
+                <p className="font-semibold text-red-600 mb-2">
+                  This category cannot be deleted because it is being used by the following products:
+                </p>
+                <div className="max-h-60 overflow-y-auto border rounded-md p-2">
+                  <ul className="space-y-2">
+                    {productsUsingCategory.map((product) => (
+                      <li key={product._id} className="flex items-center justify-between text-sm">
+                        <span>{product.name}</span>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          product.isPublished ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {product.isPublished ? 'Published' : 'Draft'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  To delete this category, you must first reassign or delete these products.
+                </p>
+              </div>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (category) {
+                handleDelete(category._id);
+              }
+            }}
+            className="bg-red-600 hover:bg-red-700"
+            disabled={productsUsingCategory.length > 0}
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -169,8 +274,8 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between p-6 border-b">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Categories</h1>
           <p className="text-muted-foreground">
@@ -181,162 +286,198 @@ export default function CategoriesPage() {
           <DialogTrigger asChild>
             <Button onClick={() => {
               setSelectedCategory(null);
-              setFormData({ name: "", description: "" });
+              setFormData({ name: "", description: "", image: "", status: "active" });
             }}>
               <Plus className="mr-2 h-4 w-4" />
               Add Category
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
                 {selectedCategory ? "Edit Category" : "Create New Category"}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="Enter category name"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Input
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  placeholder="Enter category description"
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsOpen(false);
-                    setSelectedCategory(null);
-                    setFormData({ name: "", description: "" });
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  {selectedCategory ? "Update" : "Create"}
-                </Button>
-              </div>
-            </form>
+            <div className="max-h-[calc(100vh-200px)] overflow-y-auto pr-6 -mr-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    placeholder="Enter category name"
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Input
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    placeholder="Enter category description"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Image</Label>
+                  <ImageUpload
+                    value={formData.image}
+                    onChange={(url) => setFormData({ ...formData, image: url })}
+                    onRemove={() => setFormData({ ...formData, image: "" })}
+                    type="categories"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <select
+                    id="status"
+                    value={formData.status}
+                    onChange={(e) =>
+                      setFormData({ ...formData, status: e.target.value as "active" | "inactive" })
+                    }
+                    className="w-full rounded-md border border-input bg-background px-3 py-2"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </form>
+            </div>
+            <DialogFooter className="mt-6">
+              <Button type="submit" onClick={handleSubmit} disabled={!formData.name}>
+                {selectedCategory ? "Update" : "Create"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="rounded-md border">
-        <div className="p-4">
-          <div className="relative w-full overflow-auto">
-            <table className="w-full caption-bottom text-sm">
-              <thead className="border-b">
-                <tr className="border-b transition-colors hover:bg-muted/50">
-                  <th className="h-12 px-4 text-left align-middle font-medium">
-                    Name
-                  </th>
-                  <th className="h-12 px-4 text-left align-middle font-medium">
-                    Description
-                  </th>
-                  <th className="h-12 px-4 text-left align-middle font-medium">
-                    Status
-                  </th>
-                  <th className="h-12 px-4 text-right align-middle font-medium">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {categories.map((category) => (
-                  <tr
-                    key={category._id}
-                    className="border-b transition-colors hover:bg-muted/50"
+      <div className="flex-1 p-6 overflow-y-auto">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {categories.length === 0 ? (
+            <div className="col-span-full flex h-[200px] items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25">
+              <div className="text-center">
+                <ImagePlus className="mx-auto h-10 w-10 text-muted-foreground/50" />
+                <p className="mt-2 text-muted-foreground">No categories found</p>
+                <Button
+                  variant="link"
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    setFormData({ name: "", description: "", image: "", status: "active" });
+                    setIsOpen(true);
+                  }}
+                  className="mt-2"
+                >
+                  Add your first category
+                </Button>
+              </div>
+            </div>
+          ) : (
+            categories.map((category) => (
+              <div
+                key={category._id}
+                className="group relative overflow-hidden rounded-xl border bg-card transition-all duration-200 hover:shadow-lg hover:shadow-primary/5"
+              >
+                <div className="absolute right-4 top-4 z-10 flex space-x-2 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 bg-white/80 backdrop-blur-sm hover:bg-white"
+                    onClick={() => handleEdit(category)}
                   >
-                    <td className="p-4 align-middle">{category.name}</td>
-                    <td className="p-4 align-middle">{category.description}</td>
-                    <td className="p-4 align-middle">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          category.isActive
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {category.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="p-4 align-middle text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="mr-2"
-                        onClick={() => handleEdit(category)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-red-500 hover:text-red-600"
-                        onClick={() => {
-                          setSelectedCategory(category);
-                          setIsDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-                {categories.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="p-4 text-center text-muted-foreground">
-                      No categories found
-                    </td>
-                  </tr>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 bg-white/80 backdrop-blur-sm hover:bg-red-50 hover:text-red-600"
+                    onClick={() => {
+                      setSelectedCategory(category);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {category.image ? (
+                  <div className="aspect-[4/3] relative overflow-hidden">
+                    <div className="absolute inset-0 bg-black/5" />
+                    <img
+                      src={category.image}
+                      alt={category.name}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        img.src = 'https://via.placeholder.com/400x300?text=No+Image';
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-[4/3] relative overflow-hidden bg-muted/10">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ImagePlus className="h-8 w-8 text-muted-foreground/30" />
+                    </div>
+                  </div>
                 )}
-              </tbody>
-            </table>
-          </div>
+
+                <div className="space-y-2.5 p-4">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold leading-none tracking-tight">
+                      {category.name}
+                    </h3>
+                    {category.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {category.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
+                      category.status === "active" 
+                        ? 'bg-green-50 text-green-700 ring-green-600/20' 
+                        : 'bg-yellow-50 text-yellow-700 ring-yellow-600/20'
+                    }`}>
+                      <span className={`mr-1 h-1.5 w-1.5 rounded-full ${
+                        category.status === "active" 
+                          ? 'bg-green-600' 
+                          : 'bg-yellow-600'
+                      }`} />
+                      {category.status === "active" ? "Active" : "Inactive"}
+                    </span>
+
+                    <div className="text-xs text-muted-foreground">
+                      {/* You can add additional metadata here, like product count */}
+                      {/* Example: {category.productCount} products */}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the category. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setIsDeleteDialogOpen(false);
-              setSelectedCategory(null);
-            }}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => selectedCategory && handleDelete(selectedCategory._id)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Add the delete confirmation dialog */}
+      {selectedCategory && (
+        <DeleteConfirmationDialog
+          category={selectedCategory}
+          isOpen={isDeleteDialogOpen}
+          onClose={() => {
+            setIsDeleteDialogOpen(false);
+            setSelectedCategory(null);
+          }}
+        />
+      )}
     </div>
   );
 } 

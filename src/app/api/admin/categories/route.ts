@@ -12,8 +12,19 @@ function createSlug(name: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+// Helper function to validate image URL
+function isValidImageUrl(url: string): boolean {
+  return url.startsWith('https://') && (
+    url.endsWith('.jpg') || 
+    url.endsWith('.jpeg') || 
+    url.endsWith('.png') || 
+    url.endsWith('.webp') || 
+    url.endsWith('.gif')
+  );
+}
+
 // GET all categories
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -21,10 +32,33 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const checkProducts = searchParams.get("checkProducts");
+    const categoryId = searchParams.get("categoryId");
+
     const client = await clientPromise;
     const db = client.db();
-    const categories = await db.collection("categories").find({}).toArray();
 
+    // If checking products for a specific category
+    if (checkProducts === "true" && categoryId) {
+      const products = await db
+        .collection("products")
+        .find({ "category._id": new ObjectId(categoryId) })
+        .project({ _id: 1, name: 1, status: 1, isPublished: 1 })
+        .toArray();
+
+      return NextResponse.json({
+        productsUsingCategory: products.map(p => ({
+          _id: p._id.toString(),
+          name: p.name,
+          status: p.status,
+          isPublished: p.isPublished
+        }))
+      });
+    }
+
+    // Regular categories fetch
+    const categories = await db.collection("categories").find({}).toArray();
     return NextResponse.json(categories);
   } catch (error) {
     console.error("Error fetching categories:", error);
@@ -44,11 +78,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, description } = await req.json();
+    const { name, description, image, status } = await req.json();
 
     if (!name) {
       return NextResponse.json(
         { error: "Name is required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate image URL if provided
+    if (image && !isValidImageUrl(image)) {
+      return NextResponse.json(
+        { error: "Invalid image URL. Must be a valid HTTPS URL ending with jpg, jpeg, png, webp, or gif" },
         { status: 400 }
       );
     }
@@ -73,7 +115,9 @@ export async function POST(req: Request) {
       name,
       slug,
       description: description || "",
-      isActive: true,
+      image: image || null,
+      status: status || "active",
+      isActive: status !== "inactive",
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: session.user.id,
@@ -103,11 +147,19 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id, name, description, isActive } = await req.json();
+    const { id, name, description, image, status } = await req.json();
 
     if (!id || !name) {
       return NextResponse.json(
         { error: "ID and name are required" },
+        { status: 400 }
+      );
+    }
+
+    // Validate image URL if provided
+    if (image && !isValidImageUrl(image)) {
+      return NextResponse.json(
+        { error: "Invalid image URL. Must be a valid HTTPS URL ending with jpg, jpeg, png, webp, or gif" },
         { status: 400 }
       );
     }
@@ -131,18 +183,28 @@ export async function PATCH(req: Request) {
     }
 
     const slug = createSlug(name);
+    const updateData: any = {
+      name,
+      slug,
+      description,
+      updatedAt: new Date(),
+      updatedBy: session.user.id,
+    };
+
+    // Only update image if provided
+    if (image !== undefined) {
+      updateData.image = image;
+    }
+
+    // Update status and isActive if provided
+    if (status) {
+      updateData.status = status;
+      updateData.isActive = status === "active";
+    }
+
     const result = await db.collection("categories").updateOne(
       { _id: new ObjectId(id) },
-      {
-        $set: {
-          name,
-          slug,
-          description,
-          isActive,
-          updatedAt: new Date(),
-          updatedBy: session.user.id,
-        },
-      }
+      { $set: updateData }
     );
 
     if (result.matchedCount === 0) {
@@ -191,18 +253,20 @@ export async function DELETE(req: Request) {
     // Check if category is being used by any products
     const productsUsingCategory = await db
       .collection("products")
-      .findOne({ categoryId: new ObjectId(id) });
+      .findOne({ "category._id": new ObjectId(id) });
 
     if (productsUsingCategory) {
+      console.log("Found product using category:", productsUsingCategory._id);
       return NextResponse.json(
         { error: "Cannot delete category that is being used by products" },
         { status: 400 }
       );
     }
 
-    const result = await db
-      .collection("categories")
-      .deleteOne({ _id: new ObjectId(id) });
+    // Attempt to delete the category
+    const result = await db.collection("categories").deleteOne({
+      _id: new ObjectId(id)
+    });
 
     if (result.deletedCount === 0) {
       return NextResponse.json(
@@ -214,6 +278,15 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting category:", error);
+    
+    // Handle invalid ObjectId error
+    if (error instanceof Error && error.message.includes("ObjectId")) {
+      return NextResponse.json(
+        { error: "Invalid category ID format" },
+        { status: 400 }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to delete category" },
       { status: 500 }

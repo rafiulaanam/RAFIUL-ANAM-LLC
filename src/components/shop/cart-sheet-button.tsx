@@ -13,19 +13,19 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 
-interface AddToCartButtonProps {
+interface CartSheetButtonProps {
   productId: string;
   price: number;
   name: string;
   image: string;
 }
 
-export function AddToCartButton({
+export function CartSheetButton({
   productId,
   price,
   name,
   image,
-}: AddToCartButtonProps) {
+}: CartSheetButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const { addItem, cart, loading } = useShoppingCart();

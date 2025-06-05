@@ -8,11 +8,16 @@ export interface Product {
     _id: string;
     name: string;
   };
+  vendor: {
+    _id: string;
+    name: string;
+  };
   brand: string;
   inventory: {
     quantity: number;
     lowStockThreshold: number;
   };
+  status: "approved" | "pending" | "rejected" | "draft";
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

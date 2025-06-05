@@ -1,98 +1,117 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useState } from "react";
+import { useDropzone } from "react-dropzone";
 import Image from "next/image";
+import { ImagePlus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ImageUploadProps {
-  disabled?: boolean;
+  value: string;
   onChange: (value: string) => void;
   onRemove: () => void;
-  value: string;
+  disabled?: boolean;
+  type?: "products" | "categories";
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({
-  disabled,
+const ImageUpload = ({
+  value,
   onChange,
   onRemove,
-  value
-}) => {
-  const [loading, setLoading] = useState(false);
+  disabled,
+  type = "products"
+}: ImageUploadProps) => {
+  const [isUploading, setIsUploading] = useState(false);
 
-  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     try {
-      setLoading(true);
-      const file = e.target.files?.[0];
+      setIsUploading(true);
+      const file = acceptedFiles[0];
+
       if (!file) return;
 
+      // Create form data
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!);
+      formData.append("file", file);
+      formData.append("type", type);
 
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      const data = await response.json();
+      // Upload to your storage service (e.g., S3, Cloudinary)
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to upload image');
+        throw new Error("Upload failed");
       }
 
-      onChange(data.secure_url);
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || "Upload failed");
+      }
+      
+      onChange(data.url);
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error("Error uploading image:", error);
     } finally {
-      setLoading(false);
+      setIsUploading(false);
     }
-  };
+  }, [onChange, type]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp"]
+    },
+    maxFiles: 1,
+    disabled: disabled || isUploading,
+  });
+
+  const aspectRatio = type === "categories" ? "aspect-video" : "aspect-square";
 
   return (
-    <div className="space-y-4 w-full">
-      <input
-        type="file"
-        accept="image/*"
-        disabled={disabled || loading}
-        style={{ display: 'none' }}
-        onChange={onUpload}
-        id="imageUpload"
-      />
-      <div className="flex flex-col items-center justify-center gap-4">
-        {value && (
-          <div className="relative w-40 h-40">
-            <Image
-              fill
-              alt="Product image"
-              src={value}
-              className="object-cover rounded-md"
-            />
-          </div>
-        )}
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            disabled={disabled || loading}
-            variant="secondary"
-            onClick={() => document.getElementById('imageUpload')?.click()}
-          >
-            {loading ? 'Uploading...' : value ? 'Change Image' : 'Upload Image'}
-          </Button>
-          {value && (
+    <div className="mb-4 flex flex-col items-center justify-center gap-4">
+      {value ? (
+        <div className={`relative ${aspectRatio} w-full max-w-[400px] rounded-lg overflow-hidden`}>
+          <div className="absolute right-2 top-2 z-10">
             <Button
               type="button"
-              disabled={disabled || loading}
-              variant="destructive"
               onClick={onRemove}
+              variant="destructive"
+              size="icon"
+              className="h-8 w-8"
+              disabled={disabled}
             >
-              Remove
+              <X className="h-4 w-4" />
             </Button>
-          )}
+          </div>
+          <Image
+            src={value}
+            alt="Uploaded image"
+            className="object-cover"
+            fill
+            sizes="(max-width: 400px) 100vw, 400px"
+          />
         </div>
-      </div>
+      ) : (
+        <div
+          {...getRootProps()}
+          className={`
+            relative flex ${aspectRatio} w-full max-w-[400px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center transition-colors
+            ${isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25"}
+            ${disabled ? "cursor-not-allowed opacity-50" : "hover:border-primary hover:bg-primary/5"}
+          `}
+        >
+          <input {...getInputProps()} />
+          <ImagePlus className="h-10 w-10 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">
+            {isUploading ? "Uploading..." : "Drag & drop or click to upload"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {type === "categories" ? "Recommended size: 600x400" : "Recommended size: 800x800"}
+          </p>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,32 +1,49 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
+import { Product } from '@/types';
 
 export interface CartItem {
   productId: string;
   name: string;
   price: number;
   quantity: number;
-  image: string;
+  images: string[];
   stock?: number;
+  comparePrice?: number;
+}
+
+interface CartState {
+  items: CartItem[];
+  total: number;
+  subtotal: number;
+  tax: number;
+  shipping: number;
 }
 
 interface CartStore {
-  cart: {
-    items: CartItem[];
-    total: number;
-  };
+  cart: CartState;
   loading: boolean;
   loadingItems: Set<string>;
   initialized: boolean;
-  addItem: (item: Omit<CartItem, 'quantity'> & { quantity?: number }) => Promise<void>;
+  addItem: (product: Product, quantity?: number) => Promise<void>;
   removeItem: (productId: string) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
   loadCart: () => Promise<void>;
   clearCart: () => Promise<void>;
 }
 
-const calculateTotal = (items: CartItem[]) => {
-  return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+const calculateCartTotals = (items: CartItem[]): CartState => {
+  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const tax = subtotal * 0.1; // 10% tax
+  const shipping = subtotal > 100 ? 0 : 10; // Free shipping over $100
+  
+  return {
+    items,
+    subtotal,
+    tax,
+    shipping,
+    total: subtotal + tax + shipping
+  };
 };
 
 const syncWithLocalStorage = (items: CartItem[]) => {
@@ -48,16 +65,26 @@ const loadFromLocalStorage = (): CartItem[] => {
   return [];
 };
 
+const initialCartState: CartState = {
+  items: [],
+  subtotal: 0,
+  tax: 0,
+  shipping: 0,
+  total: 0
+};
+
 export const useCartStore = create<CartStore>((set, get) => ({
-  cart: {
-    items: [],
-    total: 0
-  },
+  cart: initialCartState,
   loading: false,
   loadingItems: new Set<string>(),
   initialized: false,
 
   loadCart: async () => {
+    // Prevent multiple simultaneous calls and reloading if already initialized
+    if (get().loading || get().initialized) {
+      return;
+    }
+
     try {
       set({ loading: true });
       
@@ -69,10 +96,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       if (response.ok) {
         const items = data.items || [];
         set({ 
-          cart: {
-            items,
-            total: calculateTotal(items)
-          },
+          cart: calculateCartTotals(items),
           initialized: true,
           loading: false 
         });
@@ -80,10 +104,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
         // If API fails (guest user), load from localStorage
         const items = loadFromLocalStorage();
         set({ 
-          cart: {
-            items,
-            total: calculateTotal(items)
-          },
+          cart: calculateCartTotals(items),
           initialized: true,
           loading: false 
         });
@@ -98,10 +119,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       // Fallback to localStorage on error
       const items = loadFromLocalStorage();
       set({ 
-        cart: {
-          items,
-          total: calculateTotal(items)
-        },
+        cart: calculateCartTotals(items),
         initialized: true,
         loading: false 
       });
@@ -109,33 +127,40 @@ export const useCartStore = create<CartStore>((set, get) => ({
     }
   },
 
-  addItem: async (newItem) => {
+  addItem: async (product, quantity = 1) => {
     try {
-      const quantity = newItem.quantity || 1;
       const currentItems = get().cart.items;
-      const existingItem = currentItems.find(item => item.productId === newItem.productId);
+      const existingItem = currentItems.find(item => item.productId === product._id);
 
       // Set loading state for this item
       set(state => ({
-        loadingItems: new Set(state.loadingItems).add(newItem.productId)
+        loadingItems: new Set(state.loadingItems).add(product._id)
       }));
+
+      // Prepare cart item from product
+      const cartItem: CartItem = {
+        productId: product._id,
+        name: product.name,
+        price: product.price,
+        quantity,
+        images: product.images,
+        stock: product.stock,
+        comparePrice: product.comparePrice
+      };
 
       // Try API first
       const response = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newItem, quantity })
+        body: JSON.stringify(cartItem)
       });
 
       if (response.ok) {
         const data = await response.json();
         const items = data.items || [];
         set(state => ({ 
-          cart: {
-            items,
-            total: calculateTotal(items)
-          },
-          loadingItems: new Set([...state.loadingItems].filter(id => id !== newItem.productId))
+          cart: calculateCartTotals(items),
+          loadingItems: new Set([...state.loadingItems].filter(id => id !== product._id))
         }));
         toast.success(existingItem ? 'Cart updated' : 'Added to cart');
       } else {
@@ -143,20 +168,17 @@ export const useCartStore = create<CartStore>((set, get) => ({
         let updatedItems;
         if (existingItem) {
           updatedItems = currentItems.map(item =>
-            item.productId === newItem.productId
+            item.productId === product._id
               ? { ...item, quantity: item.quantity + quantity }
               : item
           );
         } else {
-          updatedItems = [...currentItems, { ...newItem, quantity }];
+          updatedItems = [...currentItems, cartItem];
         }
         
         set(state => ({ 
-          cart: {
-            items: updatedItems,
-            total: calculateTotal(updatedItems)
-          },
-          loadingItems: new Set([...state.loadingItems].filter(id => id !== newItem.productId))
+          cart: calculateCartTotals(updatedItems),
+          loadingItems: new Set([...state.loadingItems].filter(id => id !== product._id))
         }));
         syncWithLocalStorage(updatedItems);
         toast.success(existingItem ? 'Cart updated' : 'Added to cart');
@@ -164,7 +186,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
     } catch (error) {
       console.error('Error adding to cart:', error);
       set(state => ({
-        loadingItems: new Set([...state.loadingItems].filter(id => id !== newItem.productId))
+        loadingItems: new Set([...state.loadingItems].filter(id => id !== product._id))
       }));
       toast.error('Failed to update cart');
     }
@@ -174,24 +196,6 @@ export const useCartStore = create<CartStore>((set, get) => ({
     try {
       // If quantity is 0 or less, remove the item
       if (quantity <= 0) {
-        // Update the UI immediately for smoother transition
-        const currentItems = get().cart.items;
-        const itemToRemove = currentItems.find(item => item.productId === productId);
-        
-        if (itemToRemove) {
-          // Update local state first for immediate feedback
-          set({ 
-            cart: {
-              items: currentItems.map(item => 
-                item.productId === productId 
-                  ? { ...item, quantity: 0 }
-                  : item
-              ),
-              total: calculateTotal(currentItems.filter(item => item.productId !== productId))
-            }
-          });
-        }
-        
         await get().removeItem(productId);
         return;
       }
@@ -201,30 +205,9 @@ export const useCartStore = create<CartStore>((set, get) => ({
         loadingItems: new Set(state.loadingItems).add(productId)
       }));
 
-      // Get current item to show proper toast message
-      const currentItems = get().cart.items;
-      const currentItem = currentItems.find(item => item.productId === productId);
-      const isIncrease = currentItem && quantity > currentItem.quantity;
-
-      // Update local state immediately for smooth UI
-      set({ 
-        cart: {
-          items: currentItems.map(item =>
-            item.productId === productId
-              ? { ...item, quantity }
-              : item
-          ),
-          total: calculateTotal(currentItems.map(item =>
-            item.productId === productId
-              ? { ...item, quantity }
-              : item
-          ))
-        }
-      });
-
       // Try API first
       const response = await fetch(`/api/cart/${productId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantity })
       });
@@ -233,17 +216,13 @@ export const useCartStore = create<CartStore>((set, get) => ({
         const data = await response.json();
         const items = data.items || [];
         set(state => ({ 
-          cart: {
-            items,
-            total: calculateTotal(items)
-          },
+          cart: calculateCartTotals(items),
           loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
         }));
-        if (quantity !== 0) { // Don't show toast for intermediate steps
-          toast.success(isIncrease ? 'Quantity increased' : 'Quantity decreased');
-        }
+        toast.success('Cart updated');
       } else {
         // Fallback to localStorage
+        const currentItems = get().cart.items;
         const updatedItems = currentItems.map(item =>
           item.productId === productId
             ? { ...item, quantity }
@@ -251,23 +230,18 @@ export const useCartStore = create<CartStore>((set, get) => ({
         );
         
         set(state => ({ 
-          cart: {
-            items: updatedItems,
-            total: calculateTotal(updatedItems)
-          },
+          cart: calculateCartTotals(updatedItems),
           loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
         }));
         syncWithLocalStorage(updatedItems);
-        if (quantity !== 0) { // Don't show toast for intermediate steps
-          toast.success(isIncrease ? 'Quantity increased' : 'Quantity decreased');
-        }
+        toast.success('Cart updated');
       }
     } catch (error) {
       console.error('Error updating cart:', error);
       set(state => ({
         loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
       }));
-      toast.error('Failed to update quantity');
+      toast.error('Failed to update cart');
     }
   },
 
@@ -278,20 +252,6 @@ export const useCartStore = create<CartStore>((set, get) => ({
         loadingItems: new Set(state.loadingItems).add(productId)
       }));
 
-      // Get item name for toast message and update UI immediately
-      const currentItems = get().cart.items;
-      const itemToRemove = currentItems.find(item => item.productId === productId);
-      
-      // Update UI immediately for better responsiveness
-      if (itemToRemove) {
-        set({ 
-          cart: {
-            items: currentItems.filter(item => item.productId !== productId),
-            total: calculateTotal(currentItems.filter(item => item.productId !== productId))
-          }
-        });
-      }
-
       // Try API first
       const response = await fetch(`/api/cart/${productId}`, {
         method: 'DELETE'
@@ -301,28 +261,24 @@ export const useCartStore = create<CartStore>((set, get) => ({
         const data = await response.json();
         const items = data.items || [];
         set(state => ({ 
-          cart: {
-            items,
-            total: calculateTotal(items)
-          },
+          cart: calculateCartTotals(items),
           loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
         }));
-        toast.success(itemToRemove ? `Removed ${itemToRemove.name}` : 'Item removed from cart');
+        toast.success('Item removed from cart');
       } else {
         // Fallback to localStorage
+        const currentItems = get().cart.items;
         const updatedItems = currentItems.filter(item => item.productId !== productId);
+        
         set(state => ({ 
-          cart: {
-            items: updatedItems,
-            total: calculateTotal(updatedItems)
-          },
+          cart: calculateCartTotals(updatedItems),
           loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
         }));
         syncWithLocalStorage(updatedItems);
-        toast.success(itemToRemove ? `Removed ${itemToRemove.name}` : 'Item removed from cart');
+        toast.success('Item removed from cart');
       }
     } catch (error) {
-      console.error('Error removing item:', error);
+      console.error('Error removing from cart:', error);
       set(state => ({
         loadingItems: new Set([...state.loadingItems].filter(id => id !== productId))
       }));
@@ -333,6 +289,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
   clearCart: async () => {
     try {
       set({ loading: true });
+
       // Try API first
       const response = await fetch('/api/cart', {
         method: 'DELETE'
@@ -340,20 +297,13 @@ export const useCartStore = create<CartStore>((set, get) => ({
 
       if (response.ok) {
         set({ 
-          cart: { items: [], total: 0 },
-          loading: false,
-          loadingItems: new Set()
+          cart: initialCartState,
+          loading: false 
         });
+        localStorage.removeItem('cart');
         toast.success('Cart cleared');
       } else {
-        // Fallback to localStorage
-        set({ 
-          cart: { items: [], total: 0 },
-          loading: false,
-          loadingItems: new Set()
-        });
-        syncWithLocalStorage([]);
-        toast.success('Cart cleared');
+        throw new Error('Failed to clear cart');
       }
     } catch (error) {
       console.error('Error clearing cart:', error);

@@ -1,474 +1,360 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Loader2 } from "lucide-react";
-import { Product } from "@/types/product";
+import { useState, useCallback, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { Check, X, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ProductList } from "@/components/admin/products/product-list";
-import { ProductForm } from "@/components/admin/products/product-form";
-import { useToast } from "@/components/ui/use-toast";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import { cn } from "@/lib/utils";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
+import type { Product } from "@/types/product";
 
-interface ApiError extends Error {
-  message: string;
-}
+const STATUS_OPTIONS = [
+  { value: "all", label: "All Status" },
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+];
 
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-export default function ProductsPage() {
+export default function AdminProductsPage() {
+  const { data: session } = useSession();
   const [products, setProducts] = useState<Product[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
-  const [duplicatingProductId, setDuplicatingProductId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categories, setCategories] = useState<{ _id: string; name: string; }[]>([]);
   const { toast } = useToast();
 
   const fetchProducts = useCallback(async () => {
     try {
+      setIsLoading(true);
       const queryParams = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: '5',
         ...(searchQuery && { search: searchQuery }),
+        ...(statusFilter !== "all" && { status: statusFilter }),
+        ...(categoryFilter !== "all" && { category: categoryFilter }),
       });
 
-      const response = await fetch(`/api/products?${queryParams}`);
-      if (!response.ok) throw new Error('Failed to fetch products');
+      console.log("Fetching products with params:", queryParams.toString());
       
-      const result = await response.json();
-      if (result.success && Array.isArray(result.data)) {
-        setProducts(result.data);
-        setTotalPages(Math.ceil(result.data.length / 5));
-      } else {
-        throw new Error('Invalid response format');
+      const response = await fetch(`/api/products?${queryParams}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.details || data.error || "Failed to fetch products"
+        );
       }
+
+      if (!Array.isArray(data.products)) {
+        throw new Error("Invalid response format: products is not an array");
+      }
+
+      setProducts(data.products);
+      console.log(`Loaded ${data.products.length} products`);
     } catch (error) {
-      const apiError = error as ApiError;
+      console.error("Error fetching products:", error);
       toast({
         title: "Error",
-        description: apiError.message || "Failed to fetch products",
+        description: error instanceof Error ? error.message : "Failed to fetch products",
         variant: "destructive",
       });
+      setProducts([]); // Reset to empty array on error
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, searchQuery, toast]);
+  }, [searchQuery, statusFilter, categoryFilter, toast]);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      setIsCategoriesLoading(true);
+      const response = await fetch("/api/categories");
+      if (!response.ok) throw new Error("Failed to fetch categories");
+
+      const data = await response.json();
+      setCategories(data.categories || []);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch categories",
+        variant: "destructive",
+      });
+      setCategories([]);
+    } finally {
+      setIsCategoriesLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
-  const handleDuplicate = async (productId: string) => {
-    try {
-      setDuplicatingProductId(productId);
-      const response = await fetch(`/api/products/${productId}/duplicate`, {
-        method: 'POST',
-      });
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to duplicate product');
-      }
-
-      if (result.success) {
-        setProducts([...products, result.data]);
-        toast({
-          title: "Success",
-          description: "Product duplicated successfully",
-        });
-      }
-    } catch (error) {
-      const apiError = error as ApiError;
+  const handleBulkAction = async (action: string) => {
+    if (selectedProducts.length === 0) {
       toast({
-        title: "Error",
-        description: apiError.message || "Failed to duplicate product",
+        title: "No products selected",
+        description: "Please select products to perform this action",
         variant: "destructive",
       });
-    } finally {
-      setDuplicatingProductId(null);
+      return;
     }
-  };
 
-  const handleCreateProduct = async (data: Omit<Product, '_id'>) => {
     try {
-      setIsSubmitting(true);
-      console.log('Sending product data:', data);
-      
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json() as ApiResponse<Product>;
-      console.log('Server response:', { status: response.status, result });
-      
-      if (!response.ok) {
-        const errorMessage = `Server error (${response.status}): ${result.error || 'Unknown error'}`;
-        console.error(errorMessage);
-        throw new Error(errorMessage);
-      }
-      
-      if (result.success && result.data) {
-        setProducts([...products, result.data]);
-        setIsFormOpen(false);
-        
-        toast({
-          title: "Success",
-          description: "Product created successfully",
-        });
-      } else {
-        const errorMessage = 'Failed to create product: ' + (result.error || 'Unknown error');
-        console.error(errorMessage);
-        throw new Error(errorMessage);
-      }
-    } catch (error) {
-      const apiError = error as ApiError;
-      console.error('Create product error:', apiError);
-      toast({
-        title: "Error",
-        description: apiError.message || "Failed to create product",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleUpdateProduct = async (data: Product) => {
-    try {
-      setIsSubmitting(true);
-      if (!data._id) {
-        throw new Error("Product ID is missing");
-      }
-
-      const response = await fetch(`/api/products`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch("/api/admin/products/actions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          _id: data._id,
-          name: data.name,
-          description: data.description,
-          price: data.price,
-          image: data.image,
-          category: data.category,
-          brand: data.brand,
-          inventory: data.inventory,
-          isActive: data.isActive
+          action,
+          productIds: selectedProducts,
         }),
       });
 
-      const result = await response.json();
-      console.log('Update response:', result);
-      
       if (!response.ok) {
-        const errorMessage = result.error || `Server error: ${response.status}`;
-        console.error('Server error:', { status: response.status, result });
-        throw new Error(errorMessage);
+        const error = await response.json();
+        throw new Error(error.error);
       }
-      
-      if (result.success) {
-        setProducts(products.map((p) => (p._id === data._id ? result.data : p)));
-        setIsFormOpen(false);
-        setSelectedProduct(null);
-        
-        toast({
-          title: "Success",
-          description: "Product updated successfully",
-        });
-      } else {
-        console.error('API error:', result);
-        throw new Error(result.error || 'Failed to update product');
-      }
-    } catch (error: ApiError) {
-      console.error('Update product error:', error);
+
+      await fetchProducts();
+      setSelectedProducts([]);
+      toast({
+        title: "Success",
+        description: `Successfully ${action}ed selected products`,
+      });
+    } catch (error) {
+      console.error(`Error ${action}ing products:`, error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update product",
+        description: error instanceof Error ? error.message : `Failed to ${action} products`,
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    const productToDelete = products.find((p) => p._id === productId);
-    if (productToDelete) {
-      setSelectedProduct(productToDelete);
-      setIsDeleteDialogOpen(true);
-    }
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProducts((prev) =>
+      prev.includes(productId)
+        ? prev.filter((id) => id !== productId)
+        : [...prev, productId]
+    );
   };
 
-  const confirmDelete = async () => {
-    if (!selectedProduct?._id) return;
-
-    try {
-      setDeletingProductId(selectedProduct._id);
-      const response = await fetch(`/api/products/${selectedProduct._id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Failed to delete product');
-      
-      const result = await response.json();
-      if (result.success) {
-        setProducts(products.filter((p) => p._id !== selectedProduct._id));
-        setIsDeleteDialogOpen(false);
-        setSelectedProduct(null);
-        
-        toast({
-          title: "Success",
-          description: "Product deleted successfully",
-        });
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error: ApiError) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete product",
-        variant: "destructive",
-      });
-    } finally {
-      setDeletingProductId(null);
-    }
+  const toggleAllProducts = () => {
+    setSelectedProducts((prev) =>
+      prev.length === products.length ? [] : products.map((p) => p._id)
+    );
   };
 
-  const handleEdit = (product: Product) => {
-    setSelectedProduct(product);
-    setIsFormOpen(true);
-  };
-
-  const renderPagination = () => {
-    const pages = [];
-    const maxVisiblePages = 5;
-    
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-    
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-
-    if (startPage > 1) {
-      pages.push(
-        <PaginationItem key="1">
-          <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
-        </PaginationItem>
-      );
-      if (startPage > 2) {
-        pages.push(
-          <PaginationItem key="ellipsis1">
-            <PaginationEllipsis />
-          </PaginationItem>
-        );
-      }
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(
-        <PaginationItem key={i}>
-          <PaginationLink
-            isActive={currentPage === i}
-            onClick={() => setCurrentPage(i)}
-          >
-            {i}
-          </PaginationLink>
-        </PaginationItem>
-      );
-    }
-
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        pages.push(
-          <PaginationItem key="ellipsis2">
-            <PaginationEllipsis />
-          </PaginationItem>
-        );
-      }
-      pages.push(
-        <PaginationItem key={totalPages}>
-          <PaginationLink onClick={() => setCurrentPage(totalPages)}>
-            {totalPages}
-          </PaginationLink>
-        </PaginationItem>
-      );
-    }
-
-    return pages;
-  };
-
-  if (isLoading) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+  if (!session || session.user.role !== "ADMIN") {
+    return null;
   }
 
   return (
     <div className="container mx-auto py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Products</h1>
-          <p className="text-muted-foreground">
-            Manage your product inventory here.
-          </p>
-        </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Product
-        </Button>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Product Management</h1>
+        <p className="text-muted-foreground">
+          Review and manage all vendor products
+        </p>
       </div>
 
-      <div className="mb-6">
-        <Input
-          placeholder="Search products..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="max-w-md"
-        />
-      </div>
-
-      <div className="space-y-4">
-        {products.map((product) => (
-          <ProductList
-            key={product._id}
-            product={product}
-            onEdit={handleEdit}
-            onDelete={handleDeleteProduct}
-            onDuplicate={handleDuplicate}
-            isDeleting={deletingProductId === product._id}
-            isDuplicating={duplicatingProductId === product._id}
+      <div className="mb-6 space-y-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          <Input
+            placeholder="Search products..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
-        ))}
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((status) => (
+                <SelectItem key={status.value} value={status.value}>
+                  {status.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select 
+            value={categoryFilter} 
+            onValueChange={setCategoryFilter}
+            disabled={isCategoriesLoading}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={
+                isCategoriesLoading 
+                  ? "Loading categories..." 
+                  : "Filter by category"
+              } />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories?.map((category) => (
+                <SelectItem key={category._id} value={category._id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              checked={selectedProducts.length === products.length}
+              onCheckedChange={toggleAllProducts}
+            />
+            <span className="text-sm text-muted-foreground">
+              {selectedProducts.length} selected
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleBulkAction("approve")}
+              disabled={selectedProducts.length === 0}
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Approve
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleBulkAction("reject")}
+              disabled={selectedProducts.length === 0}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Reject
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleBulkAction("feature")}
+              disabled={selectedProducts.length === 0}
+            >
+              <Star className="mr-2 h-4 w-4" />
+              Feature
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => handleBulkAction("delete")}
+              disabled={selectedProducts.length === 0}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {totalPages > 1 && (
-        <div className="mt-8">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
+      {isLoading ? (
+        <div className="flex justify-center py-8">Loading...</div>
+      ) : (
+        <div className="space-y-4">
+          {products.map((product) => (
+            <div
+              key={product._id}
+              className="flex items-center justify-between rounded-lg border p-4"
+            >
+              <div className="flex items-center space-x-4">
+                <Checkbox
+                  checked={selectedProducts.includes(product._id)}
+                  onCheckedChange={() => toggleProductSelection(product._id)}
                 />
-              </PaginationItem>
-              {renderPagination()}
-              <PaginationItem>
-                <PaginationNext
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h3 className="font-medium">{product.name}</h3>
+                    {product.isFeatured && (
+                      <Star className="h-4 w-4 text-yellow-500" />
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    by {product.vendor.name}
+                  </p>
+                  <div className="mt-1 flex items-center space-x-2">
+                    <Badge variant="outline">${product.price.toFixed(2)}</Badge>
+                    <Badge variant="outline">{product.category.name}</Badge>
+                    <Badge
+                      variant={
+                        product.status === "approved"
+                          ? "success"
+                          : product.status === "rejected"
+                          ? "destructive"
+                          : "secondary"
+                      }
+                    >
+                      {product.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleBulkAction("approve")}
+                  disabled={product.status === "approved"}
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleBulkAction("reject")}
+                  disabled={product.status === "rejected"}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleBulkAction("feature")}
+                >
+                  <Star
+                    className={`h-4 w-4 ${
+                      product.isFeatured ? "text-yellow-500" : ""
+                    }`}
+                  />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleBulkAction("delete")}
+                >
+                  <Trash2 className="h-4 w-4 text-red-500" />
+                </Button>
+              </div>
+            </div>
+          ))}
+          {products.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No products found
+            </div>
+          )}
         </div>
       )}
-
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[600px] h-[90vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="sticky top-0 z-10 bg-background px-6 py-4 border-b">
-            <DialogTitle>
-              {selectedProduct ? "Edit Product" : "Add New Product"}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedProduct
-                ? "Update the product details below."
-                : "Fill in the product details below."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <ProductForm
-              initialData={selectedProduct || undefined}
-              onSubmit={selectedProduct ? handleUpdateProduct : handleCreateProduct}
-              onCancel={() => {
-                setIsFormOpen(false);
-                setSelectedProduct(null);
-              }}
-              isSubmitting={isSubmitting}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              product {selectedProduct?.name} and remove it from our servers.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel 
-              onClick={() => setSelectedProduct(null)}
-              disabled={deletingProductId === selectedProduct?._id}
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              disabled={deletingProductId === selectedProduct?._id}
-              className={cn(
-                deletingProductId === selectedProduct?._id && 
-                "opacity-50 cursor-not-allowed"
-              )}
-            >
-              {deletingProductId === selectedProduct?._id ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 } 

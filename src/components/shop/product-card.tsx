@@ -4,23 +4,11 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Heart, ShoppingCart, Check, Plus, Minus } from "lucide-react";
+import { Heart, ShoppingCart, Check, Plus, Minus, Star } from "lucide-react";
 import { useShop } from "@/contexts/shop-context";
 import { useToast } from "@/components/ui/use-toast";
-
-interface Product {
-  _id: string;
-  name: string;
-  price: number;
-  images: string[];
-  category: {
-    _id: string;
-    name: string;
-  };
-  brand: string;
-  rating: number;
-  reviews: number;
-}
+import { Product } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 interface ProductCardProps {
   product: Product;
@@ -93,11 +81,28 @@ export default function ProductCard({ product, showAddToCart = true }: ProductCa
       <Link href={`/products/${product._id}`}>
         <div className="relative h-64 overflow-hidden">
           <Image
-            src={product.images[0] || '/placeholder-image.jpg'}
+            src={product.images[0] || '/images/product.png'}
             alt={product.name}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-300"
           />
+          <div className="absolute top-4 left-4 flex flex-col gap-2">
+            {product.isNew && (
+              <Badge variant="secondary" className="bg-blue-500 text-white hover:bg-blue-600">
+                New
+              </Badge>
+            )}
+            {product.isBestSeller && (
+              <Badge variant="secondary" className="bg-yellow-500 text-white hover:bg-yellow-600">
+                Best Seller
+              </Badge>
+            )}
+            {product.comparePrice && product.comparePrice > product.price && (
+              <Badge variant="secondary" className="bg-red-500 text-white hover:bg-red-600">
+                Sale
+              </Badge>
+            )}
+          </div>
           <Button
             size="icon"
             variant="ghost"
@@ -119,14 +124,19 @@ export default function ProductCard({ product, showAddToCart = true }: ProductCa
       <div className="p-6">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-muted-foreground">
-            {product.category.name}
+            {product.category?.name || product.brand}
           </span>
-          <div className="flex items-center gap-1">
-            <span className="text-sm font-medium">{product.rating}</span>
-            <span className="text-sm text-muted-foreground">
-              ({product.reviews})
-            </span>
-          </div>
+          {product.rating > 0 && (
+            <div className="flex items-center gap-1">
+              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+              <span className="text-sm font-medium">{product.rating.toFixed(1)}</span>
+              {product.reviewCount > 0 && (
+                <span className="text-sm text-muted-foreground">
+                  ({product.reviewCount})
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <Link href={`/products/${product._id}`}>
           <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-1">
@@ -134,7 +144,14 @@ export default function ProductCard({ product, showAddToCart = true }: ProductCa
           </h3>
         </Link>
         <div className="flex items-center justify-between">
-          <span className="text-lg font-bold">${product.price}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold">${product.price.toFixed(2)}</span>
+            {product.comparePrice && product.comparePrice > product.price && (
+              <span className="text-sm text-muted-foreground line-through">
+                ${product.comparePrice.toFixed(2)}
+              </span>
+            )}
+          </div>
           {showAddToCart && (
             <div className="flex items-center gap-2">
               {isInCart(product._id) ? (

@@ -3,7 +3,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Product, ProductFormData } from "@/types/product";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -27,39 +26,73 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface Category {
   _id: string;
   name: string;
-  slug: string;
   description?: string;
-  isActive: boolean;
+}
+
+interface Vendor {
+  _id: string;
+  name: string;
 }
 
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().min(1, "Description is required"),
   price: z.number().min(0, "Price must be positive"),
+  comparePrice: z.number().min(0, "Compare price must be positive").optional(),
   image: z.string().min(1, "Image is required"),
   category: z.string().min(1, "Category is required"),
+  vendor: z.string().min(1, "Vendor is required"),
   brand: z.string().min(1, "Brand is required"),
   inventory: z.object({
     quantity: z.number().min(0, "Quantity must be positive"),
     lowStockThreshold: z.number().min(0, "Threshold must be positive"),
   }),
+  status: z.enum(["draft", "pending", "approved", "rejected"]),
   isActive: z.boolean().default(true),
+  isFeatured: z.boolean().default(false),
 });
+
+interface Product {
+  _id: string;
+  name: string;
+  description: string;
+  price: number;
+  comparePrice?: number;
+  image: string;
+  category: {
+    _id: string;
+    name: string;
+  };
+  vendor: {
+    _id: string;
+    name: string;
+  };
+  brand: string;
+  inventory: {
+    quantity: number;
+    lowStockThreshold: number;
+  };
+  status: "draft" | "pending" | "approved" | "rejected";
+  isActive: boolean;
+  isFeatured: boolean;
+}
 
 interface ProductFormProps {
   initialData?: Product;
-  onSubmit: (data: ProductFormData) => Promise<void>;
+  onSubmit: (data: z.infer<typeof productSchema>) => Promise<void>;
   onCancel: () => void;
-  isSubmitting?: boolean;
 }
 
-export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: ProductFormProps) {
+export function ProductForm({ initialData, onSubmit, onCancel }: ProductFormProps) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -68,82 +101,83 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
         name: initialData.name,
         description: initialData.description,
         price: initialData.price,
+        comparePrice: initialData.comparePrice,
         image: initialData.image,
         category: initialData.category._id,
+        vendor: initialData.vendor._id,
         brand: initialData.brand,
         inventory: initialData.inventory,
+        status: initialData.status,
         isActive: initialData.isActive,
+        isFeatured: initialData.isFeatured,
       } : {
         name: "",
         description: "",
         price: 0,
+        comparePrice: undefined,
         image: "",
         category: "",
+        vendor: "",
         brand: "",
         inventory: {
           quantity: 0,
           lowStockThreshold: 10,
         },
+        status: "draft",
         isActive: true,
+        isFeatured: false,
       }),
     },
   });
 
   useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch("/api/admin/categories");
-        if (!response.ok) throw new Error("Failed to fetch categories");
-        const data = await response.json();
-        setCategories(data);
+        const [categoriesRes, vendorsRes] = await Promise.all([
+          fetch("/api/categories"),
+          fetch("/api/vendors"),
+        ]);
+
+        if (categoriesRes.ok && vendorsRes.ok) {
+          const [categoriesData, vendorsData] = await Promise.all([
+            categoriesRes.json(),
+            vendorsRes.json(),
+          ]);
+
+          setCategories(categoriesData.categories);
+          setVendors(vendorsData.vendors);
+        }
       } catch (error) {
-        console.error("Error fetching categories:", error);
+        console.error("Error fetching form data:", error);
       } finally {
-        setIsLoadingCategories(false);
+        setIsLoading(false);
       }
     };
 
-    fetchCategories();
+    fetchData();
   }, []);
 
   const handleSubmit = async (data: z.infer<typeof productSchema>) => {
-    console.log('Form data before submission:', data);
     try {
-      const categoryData = categories.find(cat => cat._id === data.category);
-      if (!categoryData) {
-        console.error('Selected category not found');
-        return;
-      }
-
-      // Prepare the submission data
-      const submissionData = {
-        ...data,
-        // Include _id if this is an update operation
-        ...(initialData?._id ? { _id: initialData._id } : {}),
-        price: Number(data.price), // Ensure price is a number
-        inventory: {
-          quantity: Number(data.inventory.quantity),
-          lowStockThreshold: Number(data.inventory.lowStockThreshold)
-        },
-        // For updates, we need to send the full category object
-        category: initialData?._id ? {
-          _id: data.category,
-          name: categoryData.name
-        } : data.category, // For create, just send the ID
-      };
-
-      console.log('Submitting data:', submissionData);
-      await onSubmit(submissionData);
-    } catch (error) {
-      console.error('Error in form submission:', error);
-      // You might want to show an error toast here
+      setIsSubmitting(true);
+      await onSubmit(data);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-6">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 pb-16">
-        <div className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <div className="grid gap-6">
           <div className="grid gap-4 md:grid-cols-2">
             <FormField
               control={form.control}
@@ -213,14 +247,41 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
             />
             <FormField
               control={form.control}
+              name="comparePrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Compare at Price</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="149.99"
+                      {...field}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        field.onChange(value ? parseFloat(value) : undefined);
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Original price for showing discount
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
               name="category"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Category</FormLabel>
                   <Select
-                    disabled={isLoadingCategories}
-                    onValueChange={field.onChange}
                     value={field.value}
+                    onValueChange={field.onChange}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -231,9 +292,39 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                       {categories.map((category) => (
                         <SelectItem
                           key={category._id}
-                          value={category._id.toString()}
+                          value={category._id}
                         >
                           {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="vendor"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Vendor</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a vendor" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {vendors.map((vendor) => (
+                        <SelectItem
+                          key={vendor._id}
+                          value={vendor._id}
+                        >
+                          {vendor.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -253,7 +344,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                 <FormControl>
                   <ImageUpload
                     value={field.value}
-                    disabled={false}
+                    disabled={isSubmitting}
                     onChange={field.onChange}
                     onRemove={() => field.onChange("")}
                   />
@@ -269,7 +360,7 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
               name="inventory.quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quantity</FormLabel>
+                  <FormLabel>Stock Quantity</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -296,6 +387,9 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                       onChange={(e) => field.onChange(parseInt(e.target.value))}
                     />
                   </FormControl>
+                  <FormDescription>
+                    Alert when stock falls below this number
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -304,13 +398,64 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
 
           <FormField
             control={form.control}
-            name="isActive"
+            name="status"
             render={({ field }) => (
-              <FormItem className="bg-secondary/20 rounded-lg">
-                <div className="flex flex-row items-center justify-between p-4">
-                  <div className="space-y-1">
-                    <FormLabel>Active Status</FormLabel>
-                    <FormDescription className="text-sm text-muted-foreground">
+              <FormItem>
+                <FormLabel>Status</FormLabel>
+                <FormControl>
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    className="flex flex-col space-y-1"
+                  >
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="draft" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        Draft
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="pending" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        Pending Review
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="approved" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        Approved
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <RadioGroupItem value="rejected" />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        Rejected
+                      </FormLabel>
+                    </FormItem>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="isActive"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Active Status</FormLabel>
+                    <FormDescription>
                       Make this product visible to customers
                     </FormDescription>
                   </div>
@@ -320,36 +465,54 @@ export function ProductForm({ initialData, onSubmit, onCancel, isSubmitting }: P
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
-                </div>
-              </FormItem>
-            )}
-          />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="isFeatured"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Featured Product</FormLabel>
+                    <FormDescription>
+                      Show this product in featured sections
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-background py-4 px-6 border-t">
-          <div className="flex justify-end gap-4 max-w-[600px] mx-auto">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onCancel}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {initialData ? "Updating..." : "Creating..."}
-                </>
-              ) : (
-                <>{initialData ? "Update" : "Create"} Product</>
-              )}
-            </Button>
-          </div>
+        <div className="flex justify-end gap-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {initialData ? "Updating..." : "Creating..."}
+              </>
+            ) : (
+              <>{initialData ? "Update" : "Create"} Product</>
+            )}
+          </Button>
         </div>
       </form>
     </Form>

@@ -8,6 +8,9 @@ export interface IUser extends Document {
   image?: string;
   role: 'ADMIN' | 'VENDOR' | 'USER';
   isActive: boolean;
+  isVerified: boolean;
+  verificationToken?: string;
+  verificationTokenExpiry?: Date;
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -45,6 +48,18 @@ const userSchema = new Schema<IUser>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationToken: {
+      type: String,
+      select: false,
+    },
+    verificationTokenExpiry: {
+      type: Date,
+      select: false,
     },
     lastLogin: {
       type: Date,
