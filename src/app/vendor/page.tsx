@@ -77,7 +77,7 @@ export default function VendorDashboard() {
     <div className="p-6">
       <div className="mb-8">
         <h1 className="text-2xl font-bold">Welcome back, Vendor!</h1>
-        <p className="text-gray-500">Here's what's happening with your store today.</p>
+        <p className="text-gray-500">Here&apos;s what&apos;s happening with your store today.</p>
       </div>
 
       {/* Stats Grid */}

@@ -127,9 +127,10 @@ export async function GET(
         'Content-Type': 'text/html',
       },
     });
-  } catch (error: any) {
+  } catch (error) {
+    const apiError = error as Error;
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: apiError.message },
       { status: 500 }
     );
   }

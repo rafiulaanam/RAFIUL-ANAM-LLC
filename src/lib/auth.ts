@@ -6,9 +6,13 @@ import bcrypt from "bcryptjs";
 import clientPromise from "./db";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { MongoClient } from "mongodb";
-import { ObjectId } from "mongodb";
+import { Session } from "next-auth";
 
 let client: MongoClient;
+
+export function isAdmin(session: Session | null): boolean {
+  return session?.user?.role === "ADMIN";
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),

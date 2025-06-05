@@ -43,8 +43,8 @@ export default function Brands() {
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
             Trusted by Leading Brands
           </h2>
-          <p className="text-lg text-muted-foreground">
-            We partner with the world's top brands to bring you quality products.
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            We&apos;re proud to partner with the world&apos;s leading brands.
           </p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center">

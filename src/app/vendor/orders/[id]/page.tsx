@@ -24,6 +24,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 
 interface OrderItem {
   productId: string;
@@ -127,7 +128,7 @@ export default function VendorOrderDetailsPage() {
           <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h1 className="text-2xl font-bold mb-2">Order not found</h1>
           <p className="text-muted-foreground mb-8">
-            The order you're looking for doesn't exist or you don't have permission to view it.
+            The order you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.
           </p>
           <Button onClick={() => router.push("/vendor/orders")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -245,10 +246,11 @@ export default function VendorOrderDetailsPage() {
               {order.items.map((item) => (
                 <div key={item.productId} className="flex items-start gap-4">
                   <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border">
-                    <img
+                    <Image
                       src={item.image}
                       alt={item.name}
-                      className="h-full w-full object-cover"
+                      fill
+                      className="object-cover"
                     />
                   </div>
                   <div className="flex-1">

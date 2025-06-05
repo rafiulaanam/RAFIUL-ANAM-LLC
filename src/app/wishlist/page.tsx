@@ -11,6 +11,13 @@ import { formatPrice } from "@/lib/utils";
 import { Trash2, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 
+interface WishlistItem {
+  productId: string;
+  name: string;
+  price: number;
+  image: string;
+}
+
 export default function WishlistPage() {
   const {
     items,
@@ -27,7 +34,7 @@ export default function WishlistPage() {
     loadWishlist();
   }, [loadWishlist]);
 
-  const handleAddToCart = async (item: any) => {
+  const handleAddToCart = async (item: WishlistItem) => {
     await addToCart({
       productId: item.productId,
       name: item.name,

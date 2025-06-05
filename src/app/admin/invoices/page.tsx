@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import {
-  FileText,
   Search,
   ArrowUpDown,
   Download,
@@ -30,6 +29,10 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
+
+interface ApiError extends Error {
+  message: string;
+}
 
 interface Order {
   _id: string;
@@ -68,11 +71,7 @@ export default function InvoicesPage() {
   const [sortOrder, setSortOrder] = useState("desc");
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchOrders();
-  }, [page, statusFilter, searchQuery, sortBy, sortOrder]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams({
@@ -94,16 +93,21 @@ export default function InvoicesPage() {
       } else {
         throw new Error(result.error || "Failed to fetch orders");
       }
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: error.message,
+        description: apiError.message,
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, statusFilter, searchQuery, sortBy, sortOrder, toast]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
@@ -119,14 +123,14 @@ export default function InvoicesPage() {
       const response = await fetch(`/api/admin/invoices/${orderId}/view`);
       if (!response.ok) throw new Error("Failed to view invoice");
       
-      // Assuming the response is a PDF blob
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: error.message,
+        description: apiError.message,
         variant: "destructive",
       });
     }
@@ -146,10 +150,11 @@ export default function InvoicesPage() {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: error.message,
+        description: apiError.message,
         variant: "destructive",
       });
     }

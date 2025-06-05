@@ -39,6 +39,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Pencil, Trash2, Copy, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 
 interface Product {
   _id: string;
@@ -256,11 +257,14 @@ export default function VendorProductsPage() {
                     <TableRow key={product._id}>
                       <TableCell>
                         {product.images[0] ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="h-12 w-12 rounded-md object-cover"
-                          />
+                          <div className="relative h-12 w-12">
+                            <Image
+                              src={product.images[0]}
+                              alt={product.name}
+                              fill
+                              className="rounded-md object-cover"
+                            />
+                          </div>
                         ) : (
                           <div className="h-12 w-12 rounded-md bg-gray-100" />
                         )}

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+interface ApiError extends Error {
+  status?: number;
+  code?: string;
+}
+
 export async function GET(
   request: Request,
   { params }: { params: { orderId: string } }
@@ -107,9 +112,10 @@ export async function GET(
         'Content-Disposition': `attachment; filename=invoice-${order.orderNumber}.html`,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
+    const apiError = error as ApiError;
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: apiError.message },
       { status: 500 }
     );
   }

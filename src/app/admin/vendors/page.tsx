@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
@@ -63,21 +63,13 @@ export default function VendorsPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (session?.user?.role !== "ADMIN") {
-      router.push("/dashboard");
-    } else {
-    fetchVendors();
-    }
-  }, [session, router]);
-
-  async function fetchVendors() {
+  const fetchVendors = useCallback(async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       const response = await fetch("/api/admin/vendors");
       const data = await response.json();
 
@@ -91,9 +83,17 @@ export default function VendorsPage() {
         description: error instanceof Error ? error.message : "Failed to fetch vendors",
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (session?.user?.role !== "ADMIN") {
+      router.push("/dashboard");
+    } else {
+      fetchVendors();
+    }
+  }, [session, router, fetchVendors]);
 
   async function handleVendorStatusUpdate(vendorId: string, isActive: boolean) {
     try {
@@ -198,14 +198,19 @@ export default function VendorsPage() {
               <CardDescription>
                 Manage and monitor vendor accounts
               </CardDescription>
-      </div>
-          <Input
-            placeholder="Search vendors..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            </div>
+            {isLoading && (
+              <div className="animate-spin">
+                <Store className="h-5 w-5" />
+              </div>
+            )}
+            <Input
+              placeholder="Search vendors..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="max-w-xs"
-          />
-        </div>
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -250,12 +255,12 @@ export default function VendorsPage() {
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <Badge variant={vendor.isActive ? "default" : "secondary"}>
-                  {vendor.isActive ? "Active" : "Inactive"}
-                </Badge>
-                        <Badge variant={vendor.isVerified ? "success" : "warning"}>
+                          {vendor.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        <Badge variant={vendor.isVerified ? "default" : "secondary"}>
                           {vendor.isVerified ? "Verified" : "Unverified"}
                         </Badge>
-              </div>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

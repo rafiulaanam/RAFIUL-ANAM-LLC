@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Product } from "@/types/product";
 import { Copy, Edit, Trash, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";

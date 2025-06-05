@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import {
-  Package,
   Search,
-  ChevronDown,
   ArrowUpDown,
   MoreHorizontal,
   Loader2,
@@ -38,6 +36,10 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
+
+interface ApiError extends Error {
+  message: string;
+}
 
 interface Order {
   _id: string;
@@ -76,11 +78,7 @@ export default function OrdersPage() {
   const [sortOrder, setSortOrder] = useState("desc");
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchOrders();
-  }, [page, statusFilter, searchQuery, sortBy, sortOrder]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams({
@@ -102,16 +100,21 @@ export default function OrdersPage() {
       } else {
         throw new Error(result.error || "Failed to fetch orders");
       }
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: error.message,
+        description: apiError.message,
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, statusFilter, searchQuery, sortBy, sortOrder, toast]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
@@ -137,10 +140,11 @@ export default function OrdersPage() {
       } else {
         throw new Error(result.error || "Failed to update order status");
       }
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: error.message,
+        description: apiError.message,
         variant: "destructive",
       });
     }

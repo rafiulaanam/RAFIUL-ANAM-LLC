@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
 import { Loader2, Package, Clock, CheckCircle, XCircle } from "lucide-react";
+import Image from "next/image";
 
 interface OrderItem {
   productId: string;
@@ -168,10 +169,11 @@ export default function OrdersPage() {
               {order.items.map((item) => (
                 <div key={item.productId} className="flex items-start gap-4">
                   <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border">
-                    <img
+                    <Image
                       src={item.image}
                       alt={item.name}
-                      className="h-full w-full object-cover"
+                      fill
+                      className="object-cover"
                     />
                   </div>
                   <div className="flex-1">

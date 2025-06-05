@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { User } from "next-auth";
 import { format } from "date-fns";
 import {
   Shield,
   ShieldAlert,
-  ShieldCheck,
   Loader2,
   UserCog,
   Mail,
@@ -35,6 +34,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
+interface ApiError extends Error {
+  message: string;
+}
+
 interface ExtendedUser extends User {
   role: string;
   isActive: boolean;
@@ -52,11 +55,7 @@ export default function UsersPage() {
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const response = await fetch("/api/admin/users");
       if (!response.ok) throw new Error("Failed to fetch users");
@@ -67,16 +66,21 @@ export default function UsersPage() {
       } else {
         throw new Error(result.error || "Failed to fetch users");
       }
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: error.message || "Failed to fetch users",
+        description: apiError.message || "Failed to fetch users",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleRoleChange = async (userId: string, newRole: Role) => {
     try {
@@ -105,10 +109,11 @@ export default function UsersPage() {
           description: "User role updated successfully",
         });
       }
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: error.message || "Failed to update user role",
+        description: apiError.message || "Failed to update user role",
         variant: "destructive",
       });
     } finally {

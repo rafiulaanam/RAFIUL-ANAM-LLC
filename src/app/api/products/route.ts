@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/db";
 import { ObjectId } from "mongodb";
-import { ProductQueryParams, PaginatedResponse, IProduct } from '@/types/types';
 import type { Session } from "next-auth";
 
 interface CustomSession extends Session {
@@ -14,6 +13,26 @@ interface CustomSession extends Session {
     image?: string | null;
     role: string;
   }
+}
+
+interface ProductQuery {
+  deletedAt?: { $exists: boolean };
+  isPublished?: boolean;
+  price?: { $gte: number; $lte: number };
+  categoryId?: ObjectId;
+  brand?: string;
+  $or?: Array<{ [key: string]: { $regex: string; $options: string } }>;
+}
+
+interface SortQuery {
+  price?: 1 | -1;
+  rating?: -1;
+  createdAt?: -1;
+}
+
+interface MongoError extends Error {
+  code?: number;
+  message: string;
 }
 
 // GET products with filtering, sorting, and pagination
@@ -35,7 +54,7 @@ export async function GET(request: Request) {
     const db = client.db();
 
     // Build query
-    const query: any = {
+    const query: ProductQuery = {
       deletedAt: { $exists: false },
       isPublished: true,
       price: { $gte: minPrice, $lte: maxPrice }
@@ -58,7 +77,7 @@ export async function GET(request: Request) {
     }
 
     // Build sort
-    let sortQuery: any = {};
+    const sortQuery: SortQuery = {};
     switch (sort) {
       case "price-asc":
         sortQuery.price = 1;
@@ -297,11 +316,12 @@ export async function POST(request: Request) {
       success: true,
       data: product
     });
-  } catch (error: any) {
-    console.error("Product POST Error:", error);
+  } catch (error) {
+    const mongoError = error as MongoError;
+    console.error("Product POST Error:", mongoError);
     return NextResponse.json({
       success: false,
-      error: error.message || "Failed to create product"
+      error: mongoError.message || "Failed to create product"
     }, { status: 500 });
   }
 }
@@ -394,12 +414,13 @@ export async function PUT(request: Request) {
       success: true,
       data: result
     });
-  } catch (error: any) {
-    console.error("Product PUT Error:", error);
+  } catch (error) {
+    const mongoError = error as MongoError;
+    console.error("Product PUT Error:", mongoError);
     return NextResponse.json({
       success: false,
-      error: error.message || "Failed to update product",
-      details: error.stack
+      error: mongoError.message || "Failed to update product",
+      details: mongoError.stack
     }, { status: 500 });
   }
 }
@@ -459,11 +480,12 @@ export async function DELETE(request: Request) {
       success: true,
       message: "Product deleted successfully"
     });
-  } catch (error: any) {
-    console.error('Product DELETE Error:', error);
+  } catch (error) {
+    const mongoError = error as MongoError;
+    console.error('Product DELETE Error:', mongoError);
     return NextResponse.json({
       success: false,
-      error: error.message || "Failed to delete product"
+      error: mongoError.message || "Failed to delete product"
     }, { status: 500 });
   }
 } 

@@ -31,10 +31,8 @@ import {
   Search,
   Filter,
   MapPin,
-  Truck,
   Package,
   Calendar,
-  Clock,
   User,
   Building,
   Phone,
@@ -162,7 +160,7 @@ const mockDeliveries: Delivery[] = [
 ];
 
 export default function DeliveryPage() {
-  const [deliveries, setDeliveries] = useState<Delivery[]>(mockDeliveries);
+  const [deliveries] = useState<Delivery[]>(mockDeliveries);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 

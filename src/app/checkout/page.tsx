@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, CreditCard, Truck, MapPin } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { toast } from "sonner";
+import Image from "next/image";
 
 interface ShippingInfo {
   fullName: string;
@@ -347,10 +348,11 @@ export default function CheckoutPage() {
                 {cart.items.map(item => (
                   <div key={item.productId} className="flex items-start gap-4">
                     <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border">
-                      <img
+                      <Image
                         src={item.image}
                         alt={item.name}
-                        className="h-full w-full object-cover"
+                        fill
+                        className="object-cover"
                       />
                     </div>
                     <div className="flex-1">

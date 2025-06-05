@@ -144,7 +144,7 @@ export async function GET() {
         if (ObjectId.isValid(id)) {
           acc.push(new ObjectId(id));
         }
-      } catch (error) {
+      } catch {
         console.error(`Invalid ObjectId: ${id}`);
       }
       return acc;

@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useCartStore } from "@/store/useCartStore";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/icons";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileMenu } from "@/components/layout/profile-menu";
 import { useState, useEffect } from "react";
@@ -20,7 +18,6 @@ const navigation = [
 ];
 
 export default function Navbar() {
-  const { data: session } = useSession();
   const { cart, loading: cartLoading, loadCart } = useCartStore();
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();

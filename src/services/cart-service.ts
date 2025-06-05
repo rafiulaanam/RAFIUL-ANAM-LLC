@@ -66,7 +66,9 @@ export const CartService = {
 
     // Always update local storage
     const cart = CartService.getLocalCart();
-    const { [productId]: removed, ...updatedCart } = cart;
+    const updatedCart = Object.fromEntries(
+      Object.entries(cart).filter(([key]) => key !== productId)
+    );
     localStorage.setItem('cart', JSON.stringify(updatedCart));
     return updatedCart;
   },

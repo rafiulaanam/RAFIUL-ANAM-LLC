@@ -31,12 +31,10 @@ import {
   Search,
   Filter,
   DollarSign,
-  Calendar,
   CreditCard,
   Download,
-  Bank,
+  Wallet,
   ArrowUpRight,
-  ArrowDownRight,
   Clock,
   FileText,
 } from "lucide-react";
@@ -130,8 +128,8 @@ const mockEarningPeriods: EarningPeriod[] = [
 ];
 
 export default function PayoutsPage() {
-  const [earningPeriods, setEarningPeriods] = useState<EarningPeriod[]>(mockEarningPeriods);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(mockPaymentMethods);
+  const [earningPeriods] = useState<EarningPeriod[]>(mockEarningPeriods);
+  const [paymentMethods] = useState<PaymentMethod[]>(mockPaymentMethods);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -220,7 +218,7 @@ export default function PayoutsPage() {
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div className="rounded-lg bg-green-100 p-2 text-green-600">
-              <Bank className="h-5 w-5" />
+              <Wallet className="h-5 w-5" />
             </div>
           </div>
           <div className="mt-4">
@@ -257,7 +255,7 @@ export default function PayoutsPage() {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   {method.type === "bank_account" ? (
-                    <Bank className="h-5 w-5 text-blue-600" />
+                    <Wallet className="h-5 w-5 text-blue-600" />
                   ) : (
                     <CreditCard className="h-5 w-5 text-purple-600" />
                   )}

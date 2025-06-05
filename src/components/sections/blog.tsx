@@ -119,10 +119,10 @@ export default function Blog() {
               <Link href={`/blog/${article.id}`}>
                 <div className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                   <div className="relative h-64 sm:h-80">
-                    <Image
+                  <Image
                       src={article.image}
                       alt={article.title}
-                      fill
+                    fill
                       className="object-cover transform group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -175,9 +175,9 @@ export default function Blog() {
                       alt={article.title}
                       fill
                       className="object-cover transform group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                  <div className="p-6">
+                  />
+                </div>
+                <div className="p-6">
                     <div className="flex items-center gap-4 mb-3 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <Tag className="w-4 h-4" />

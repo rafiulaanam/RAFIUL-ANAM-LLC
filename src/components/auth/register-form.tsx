@@ -37,7 +37,7 @@ export function RegisterForm() {
       }
 
       router.push("/login?message=Registration successful. Please login.");
-    } catch (error) {
+    } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
@@ -110,11 +110,6 @@ export function RegisterForm() {
             Register as a Vendor
           </label>
         </div>
-        {error && (
-          <div className="text-sm text-red-500">
-            {error}
-          </div>
-        )}
         <button
           type="submit"
           disabled={isLoading}
@@ -122,6 +117,11 @@ export function RegisterForm() {
         >
           {isLoading ? "Creating account..." : "Create account"}
         </button>
+        {error && (
+          <div className="text-sm text-red-500 mt-2">
+            {error}
+          </div>
+        )}
       </form>
       <div className="relative">
         <div className="absolute inset-0 flex items-center">

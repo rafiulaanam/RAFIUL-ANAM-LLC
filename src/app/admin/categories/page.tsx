@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -44,12 +44,7 @@ export default function CategoriesPage() {
   });
   const { toast } = useToast();
 
-  // Fetch categories
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await fetch("/api/admin/categories");
       if (!response.ok) {
@@ -58,15 +53,21 @@ export default function CategoriesPage() {
       const data = await response.json();
       setCategories(data);
     } catch (error) {
+      console.error("Error fetching categories:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch categories",
+        description: error instanceof Error ? error.message : "Failed to fetch categories",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  // Fetch categories
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +89,8 @@ export default function CategoriesPage() {
       });
 
       if (!response.ok) {
-        throw new Error(selectedCategory ? "Failed to update category" : "Failed to create category");
+        const errorData = await response.json();
+        throw new Error(errorData.message || (selectedCategory ? "Failed to update category" : "Failed to create category"));
       }
 
       const data = await response.json();
@@ -112,6 +114,7 @@ export default function CategoriesPage() {
           : "Category created successfully",
       });
     } catch (error) {
+      console.error("Error submitting category:", error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "An error occurred",
@@ -136,7 +139,8 @@ export default function CategoriesPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to delete category");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete category");
       }
 
       setCategories(categories.filter((cat) => cat._id !== id));
@@ -147,9 +151,10 @@ export default function CategoriesPage() {
         description: "Category deleted successfully",
       });
     } catch (error) {
+      console.error("Error deleting category:", error);
       toast({
         title: "Error",
-        description: "Failed to delete category",
+        description: error instanceof Error ? error.message : "Failed to delete category",
         variant: "destructive",
       });
     }

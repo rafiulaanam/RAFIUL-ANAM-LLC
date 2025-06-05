@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Loader2 } from "lucide-react";
 import { Product } from "@/types/product";
 import { Button } from "@/components/ui/button";
@@ -36,12 +36,8 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 
-interface PaginatedProducts {
-  items: Product[];
-  total: number;
-  page: number;
-  totalPages: number;
-  hasMore: boolean;
+interface ApiError extends Error {
+  message: string;
 }
 
 interface ApiResponse<T> {
@@ -64,12 +60,7 @@ export default function ProductsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const { toast } = useToast();
 
-  // Fetch products on component mount and when page changes
-  useEffect(() => {
-    fetchProducts();
-  }, [currentPage, searchQuery]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const queryParams = new URLSearchParams({
         page: currentPage.toString(),
@@ -83,21 +74,25 @@ export default function ProductsPage() {
       const result = await response.json();
       if (result.success && Array.isArray(result.data)) {
         setProducts(result.data);
-        // If we implement pagination later, we can use these
-        // setTotalPages(Math.ceil(result.data.length / 5));
+        setTotalPages(Math.ceil(result.data.length / 5));
       } else {
         throw new Error('Invalid response format');
       }
     } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: "Failed to fetch products",
+        description: apiError.message || "Failed to fetch products",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, searchQuery, toast]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handleDuplicate = async (productId: string) => {
     try {
@@ -119,10 +114,11 @@ export default function ProductsPage() {
           description: "Product duplicated successfully",
         });
       }
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: error.message || "Failed to duplicate product",
+        description: apiError.message || "Failed to duplicate product",
         variant: "destructive",
       });
     } finally {
@@ -130,11 +126,10 @@ export default function ProductsPage() {
     }
   };
 
-  // CRUD operations
   const handleCreateProduct = async (data: Omit<Product, '_id'>) => {
     try {
       setIsSubmitting(true);
-      console.log('Sending product data:', data); // Debug the data being sent
+      console.log('Sending product data:', data);
       
       const response = await fetch('/api/products', {
         method: 'POST',
@@ -145,7 +140,7 @@ export default function ProductsPage() {
       });
 
       const result = await response.json() as ApiResponse<Product>;
-      console.log('Server response:', { status: response.status, result }); // Debug the response
+      console.log('Server response:', { status: response.status, result });
       
       if (!response.ok) {
         const errorMessage = `Server error (${response.status}): ${result.error || 'Unknown error'}`;
@@ -166,11 +161,12 @@ export default function ProductsPage() {
         console.error(errorMessage);
         throw new Error(errorMessage);
       }
-    } catch (error: any) {
-      console.error('Create product error:', error);
+    } catch (error) {
+      const apiError = error as ApiError;
+      console.error('Create product error:', apiError);
       toast({
         title: "Error",
-        description: error.message || "Failed to create product",
+        description: apiError.message || "Failed to create product",
         variant: "destructive",
       });
     } finally {
@@ -225,7 +221,7 @@ export default function ProductsPage() {
         console.error('API error:', result);
         throw new Error(result.error || 'Failed to update product');
       }
-    } catch (error: any) {
+    } catch (error: ApiError) {
       console.error('Update product error:', error);
       toast({
         title: "Error",
@@ -269,7 +265,7 @@ export default function ProductsPage() {
       } else {
         throw new Error(result.error);
       }
-    } catch (error: any) {
+    } catch (error: ApiError) {
       toast({
         title: "Error",
         description: error.message || "Failed to delete product",
@@ -290,7 +286,7 @@ export default function ProductsPage() {
     const maxVisiblePages = 5;
     
     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
     
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);

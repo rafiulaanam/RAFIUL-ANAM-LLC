@@ -98,7 +98,7 @@ export default function LoginPage() {
         router.push(callbackUrl);
         router.refresh();
       }
-    } catch (error) {
+    } catch {
       toast.error("Something went wrong. Please try again.");
     } finally {
       setIsLoading((prev) => ({ ...prev, credentials: false }));
@@ -110,7 +110,7 @@ export default function LoginPage() {
       setIsLoading((prev) => ({ ...prev, [provider]: true }));
       const callbackUrl = cleanCallbackUrl(searchParams?.get("callbackUrl"));
       await handleLogin({ provider }, callbackUrl);
-    } catch (error) {
+    } catch {
       toast.error("Something went wrong with social login. Please try again.");
       setIsLoading((prev) => ({ ...prev, [provider]: false }));
     }
@@ -214,7 +214,7 @@ export default function LoginPage() {
             </form>
           </div>
           <div className="text-center text-sm">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/register" className="underline">
               Sign up
             </Link>

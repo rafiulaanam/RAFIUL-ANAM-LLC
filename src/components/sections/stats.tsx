@@ -83,7 +83,7 @@ export default function Stats() {
             Our Growth in Numbers
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            We're proud of our achievements and the trust our customers place in us.
+            We&apos;re proud of our achievements and the trust our customers place in us.
           </p>
         </motion.div>
 

@@ -48,7 +48,7 @@ export function ProductListPagination({
     const halfVisible = Math.floor(maxVisiblePages / 2);
 
     let startPage = Math.max(currentPage - halfVisible, 1);
-    let endPage = Math.min(startPage + maxVisiblePages - 1, totalPages);
+    const endPage = Math.min(startPage + maxVisiblePages - 1, totalPages);
 
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(endPage - maxVisiblePages + 1, 1);

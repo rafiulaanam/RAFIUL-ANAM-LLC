@@ -2,6 +2,23 @@ import { NextResponse } from "next/server";
 import clientPromise from "@/lib/db";
 import { ObjectId } from "mongodb";
 
+interface ProductQuery {
+  deletedAt?: { $exists: boolean };
+  $or?: Array<{ [key: string]: { $regex: string; $options: string } }>;
+  categoryId?: ObjectId;
+  brand?: string;
+  price?: {
+    $gte?: number;
+    $lte?: number;
+  };
+}
+
+interface SortQuery {
+  price?: 1 | -1;
+  rating?: -1;
+  createdAt?: -1;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -18,7 +35,7 @@ export async function GET(request: Request) {
     const db = client.db();
 
     // Build query
-    const query: any = {
+    const query: ProductQuery = {
       deletedAt: { $exists: false }
     };
 
@@ -34,7 +51,7 @@ export async function GET(request: Request) {
     if (category) {
       try {
         query.categoryId = new ObjectId(category);
-      } catch (error) {
+      } catch {
         return NextResponse.json(
           { error: "Invalid category ID" },
           { status: 400 }
@@ -55,7 +72,7 @@ export async function GET(request: Request) {
     }
 
     // Build sort object
-    let sortQuery: any = {};
+    const sortQuery: SortQuery = {};
     switch (sort) {
       case "price_asc":
         sortQuery.price = 1;
@@ -154,7 +171,7 @@ export async function GET(request: Request) {
             _id: product.category._id.toString()
           } : undefined
         };
-      } catch (error) {
+      } catch {
         return null;
       }
     }).filter(Boolean);
@@ -167,7 +184,7 @@ export async function GET(request: Request) {
       total,
       hasMore: skip + products.length < total
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to search products" },
       { status: 500 }

@@ -4,6 +4,15 @@ import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/db";
 import { ObjectId } from "mongodb";
 
+interface OrderQuery {
+  status?: string;
+  $or?: Array<{
+    "customer.email"?: { $regex: string; $options: string };
+    "customer.name"?: { $regex: string; $options: string };
+    orderNumber?: { $regex: string; $options: string };
+  }>;
+}
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -24,7 +33,7 @@ export async function GET(request: Request) {
     const db = client.db();
 
     // Build query
-    const query: any = {};
+    const query: OrderQuery = {};
     if (status) query.status = status;
     if (search) {
       query.$or = [

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Edit, Trash } from "lucide-react";
+import Image from "next/image";
 
 interface ProductCardProps {
   product: Product;
@@ -36,11 +37,14 @@ export function ProductCard({ product, onEdit, onDelete }: ProductCardProps) {
       <CardContent>
         <div className="grid gap-4">
           <div className="flex items-center gap-4">
-            <img
-              src={product.image}
-              alt={product.name}
-              className="h-24 w-24 rounded-lg object-cover"
-            />
+            <div className="relative h-24 w-24">
+              <Image
+                src={product.image}
+                alt={product.name}
+                fill
+                className="rounded-lg object-cover"
+              />
+            </div>
             <div className="grid gap-1">
               <p className="text-sm text-muted-foreground">
                 {product.description}

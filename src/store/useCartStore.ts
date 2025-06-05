@@ -180,7 +180,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
         
         if (itemToRemove) {
           // Update local state first for immediate feedback
-          set(state => ({ 
+          set({ 
             cart: {
               items: currentItems.map(item => 
                 item.productId === productId 
@@ -189,7 +189,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
               ),
               total: calculateTotal(currentItems.filter(item => item.productId !== productId))
             }
-          }));
+          });
         }
         
         await get().removeItem(productId);
@@ -207,7 +207,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
       const isIncrease = currentItem && quantity > currentItem.quantity;
 
       // Update local state immediately for smooth UI
-      set(state => ({ 
+      set({ 
         cart: {
           items: currentItems.map(item =>
             item.productId === productId
@@ -220,7 +220,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
               : item
           ))
         }
-      }));
+      });
 
       // Try API first
       const response = await fetch(`/api/cart/${productId}`, {
@@ -284,12 +284,12 @@ export const useCartStore = create<CartStore>((set, get) => ({
       
       // Update UI immediately for better responsiveness
       if (itemToRemove) {
-        set(state => ({ 
+        set({ 
           cart: {
             items: currentItems.filter(item => item.productId !== productId),
             total: calculateTotal(currentItems.filter(item => item.productId !== productId))
           }
-        }));
+        });
       }
 
       // Try API first

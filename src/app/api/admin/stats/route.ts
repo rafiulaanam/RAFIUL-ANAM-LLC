@@ -5,13 +5,13 @@ import User from "@/models/User";
 import Vendor from "@/models/Vendor";
 import Order from "@/models/Order";
 import { getServerSession } from "next-auth";
-import { isAdmin } from "@/lib/auth";
+import { isAdmin, authOptions } from "@/lib/auth";
 
 export async function GET() {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     
-    if (!session || !isAdmin(session)) {
+    if (!isAdmin(session)) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 

@@ -4,6 +4,23 @@ import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/db";
 import { ObjectId } from "mongodb";
 
+interface DeliveryQuery {
+  status?: string | { $in: string[] };
+  $or?: Array<{
+    "customer.email"?: { $regex: string; $options: string };
+    "customer.name"?: { $regex: string; $options: string };
+    orderNumber?: { $regex: string; $options: string };
+    trackingId?: { $regex: string; $options: string };
+  }>;
+}
+
+interface DeliveryUpdateData {
+  status?: string;
+  trackingId?: string;
+  updatedAt: Date;
+  updatedBy: string;
+}
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -24,7 +41,7 @@ export async function GET(request: Request) {
     const db = client.db();
 
     // Build query
-    const query: any = {
+    const query: DeliveryQuery = {
       status: { $in: ["shipped", "out_for_delivery", "delivered"] }
     };
     if (status) query.status = status;
@@ -94,7 +111,7 @@ export async function PATCH(
     const client = await clientPromise;
     const db = client.db();
 
-    const updateData: any = {
+    const updateData: DeliveryUpdateData = {
       updatedAt: new Date(),
       updatedBy: session.user.id
     };

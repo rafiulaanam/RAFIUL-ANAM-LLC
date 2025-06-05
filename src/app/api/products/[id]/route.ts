@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import clientPromise from '@/lib/db';
-import Product from '@/models/product';
-import { ProductResponse } from '@/types/types';
 import { ObjectId } from "mongodb";
 
 // GET single product
@@ -33,7 +31,7 @@ export async function GET(
         );
       }
       productId = new ObjectId(id);
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid product ID format" },
         { status: 400 }

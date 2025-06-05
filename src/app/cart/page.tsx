@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useCartStore } from "@/store/useCartStore";
 import { Button } from "@/components/ui/button";
-import { Loader2, Minus, Plus, X, ShoppingBag, Trash2 } from "lucide-react";
+import { Loader2, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ import { Icons } from "@/components/ui/icons";
 import { toast } from "sonner";
 
 export default function CartPage() {
-  const { cart, loading, loadingItems, initialized, loadCart, updateQuantity, removeItem } = useCartStore();
+  const { cart, loading, initialized, loadCart, updateQuantity, removeItem } = useCartStore();
   const router = useRouter();
   const { data: session } = useSession();
   const [localQuantities, setLocalQuantities] = useState<{ [key: string]: number }>({});
@@ -159,7 +159,7 @@ export default function CartPage() {
           <ShoppingBag className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h1 className="text-2xl font-bold mb-2">Your cart is empty</h1>
           <p className="text-muted-foreground mb-8">
-            Looks like you haven't added anything to your cart yet.
+            Looks like you haven&apos;t added anything to your cart yet.
             Browse our products and find something you like!
           </p>
           <Link href="/shop">
@@ -302,7 +302,7 @@ export default function CartPage() {
 
             {!session && (
               <p className="text-sm text-muted-foreground text-center">
-                You'll need to login to complete your purchase
+                You&apos;ll need to login to complete your purchase
               </p>
             )}
 
@@ -311,6 +311,10 @@ export default function CartPage() {
                 Continue Shopping
               </Button>
             </Link>
+
+            <div className="text-sm text-muted-foreground">
+              You won&apos;t be charged until confirming your order at checkout.
+            </div>
           </div>
         </div>
       </div>

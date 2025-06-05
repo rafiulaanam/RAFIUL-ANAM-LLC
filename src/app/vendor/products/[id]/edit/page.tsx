@@ -17,29 +17,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 
 interface Category {
   _id: string;
   name: string;
   description?: string;
-}
-
-interface Product {
-  _id: string;
-  name: string;
-  description: string;
-  price: number;
-  comparePrice?: number;
-  stock: number;
-  lowStockThreshold: number;
-  brand: string;
-  sku?: string;
-  isPublished: boolean;
-  isFeatured: boolean;
-  trackInventory: boolean;
-  images: string[];
-  categoryId: string;
-  vendorId: string;
 }
 
 export default function EditProductPage({ params }: { params: { id: string } }) {
@@ -431,11 +414,14 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
                     key={index}
                     className="group relative aspect-square rounded-lg border bg-gray-50"
                   >
-                    <img
-                      src={image}
-                      alt={`Product ${index + 1}`}
-                      className="h-full w-full rounded-lg object-cover"
-                    />
+                    <div className="relative h-full w-full">
+                      <Image
+                        src={image}
+                        alt={`Product ${index + 1}`}
+                        fill
+                        className="rounded-lg object-cover"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => removeImage(index)}

@@ -38,6 +38,13 @@ export function SignUpForm() {
       isValid = false;
     }
 
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      newErrors.email = "Please enter a valid email address";
+      isValid = false;
+    }
+
     // Validate password
     if (!PASSWORD_REGEX.test(password)) {
       newErrors.password = "Password must be at least 6 characters and contain at least one letter and one number";
@@ -104,7 +111,7 @@ export function SignUpForm() {
       }
 
       router.push("/");
-    } catch (error: any) {
+    } catch (error: Error) {
       setError(error.message || "Something went wrong");
     } finally {
       setIsLoading(false);

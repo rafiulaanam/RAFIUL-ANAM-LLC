@@ -18,13 +18,27 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 
+interface TopProduct {
+  _id: string;
+  name: string;
+  sales: number;
+}
+
+interface RecentOrder {
+  _id: string;
+  orderNumber: string;
+  total: number;
+  status: string;
+  createdAt: string;
+}
+
 interface DashboardStats {
   totalProducts: number;
   totalUsers: number;
   totalVendors: number;
   totalOrders: number;
-  recentOrders: any[];
-  topProducts: any[];
+  recentOrders: RecentOrder[];
+  topProducts: TopProduct[];
   revenue: {
     total: number;
     change: number;
@@ -60,7 +74,7 @@ export default function AdminDashboard() {
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
         <p className="text-muted-foreground">
-          Overview of your store's performance
+          Overview of your store&apos;s performance
         </p>
       </div>
 

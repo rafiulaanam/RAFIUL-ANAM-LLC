@@ -59,7 +59,7 @@ export default function ProductGrid() {
     };
 
     fetchProducts();
-  }, [searchQuery, priceRange, selectedCategories, selectedBrands, selectedRating, sortOption]);
+  }, [searchQuery, priceRange, selectedCategories, selectedBrands, selectedRating, sortOption, toast]);
 
   if (loading) {
     return (

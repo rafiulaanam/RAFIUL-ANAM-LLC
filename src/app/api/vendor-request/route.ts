@@ -84,7 +84,7 @@ export async function POST(request: Request) {
 }
 
 // GET vendor request status for current user
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {

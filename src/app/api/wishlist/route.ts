@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/db";
-import { ObjectId } from "mongodb";
 
 // GET wishlist items
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
@@ -90,7 +89,7 @@ export async function POST(request: Request) {
 }
 
 // DELETE clear wishlist
-export async function DELETE(request: Request) {
+export async function DELETE() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {

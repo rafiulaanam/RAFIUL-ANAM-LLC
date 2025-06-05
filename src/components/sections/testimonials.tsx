@@ -65,7 +65,7 @@ export default function Testimonials() {
             What Our Customers Say
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Don't just take our word for it. Here's what our valued customers have to say about their shopping experience.
+            Don&apos;t just take our word for it. Here&apos;s what our valued customers have to say about their shopping experience.
           </p>
         </motion.div>
 
@@ -86,7 +86,7 @@ export default function Testimonials() {
                 <Quote className="w-10 h-10 text-primary/20 absolute -top-2 -left-2" />
                 <div className="relative">
                   <p className="text-lg mb-6 text-muted-foreground">
-                    "{testimonial.content}"
+                    &ldquo;{testimonial.content}&rdquo;
                   </p>
                   <div className="flex items-center gap-4">
                     <div className="relative w-12 h-12 rounded-full overflow-hidden">

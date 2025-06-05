@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import {
-  Truck,
   Search,
   ArrowUpDown,
   MoreHorizontal,
   Loader2,
-  Package,
-  MapPin,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -27,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -46,26 +44,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { formatPrice } from "@/lib/utils";
+
+interface OrderItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  price: number;
+}
+
+interface Customer {
+  name: string;
+  email: string;
+  address: string;
+}
 
 interface Order {
   _id: string;
   orderNumber: string;
-  customer: {
-    name: string;
-    email: string;
-    address: string;
-  };
+  customer: Customer;
   total: number;
   status: "shipped" | "out_for_delivery" | "delivered";
   trackingId?: string;
   createdAt: string;
-  items: Array<{
-    productId: string;
-    name: string;
-    quantity: number;
-    price: number;
-  }>;
+  items: OrderItem[];
+}
+
+interface ApiError extends Error {
+  message: string;
 }
 
 const DELIVERY_STATUS = {
@@ -82,16 +87,12 @@ export default function DeliveriesPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [sortBy, setSortBy] = useState("createdAt");
-  const [sortOrder, setSortOrder] = useState("desc");
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [dialogOrder, setDialogOrder] = useState<Order | null>(null);
   const [trackingId, setTrackingId] = useState("");
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchDeliveries();
-  }, [page, statusFilter, searchQuery, sortBy, sortOrder]);
-
-  const fetchDeliveries = async () => {
+  const fetchDeliveries = useCallback(async () => {
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams({
@@ -113,16 +114,20 @@ export default function DeliveriesPage() {
       } else {
         throw new Error(result.error || "Failed to fetch deliveries");
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : "Failed to fetch deliveries",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, statusFilter, searchQuery, sortBy, sortOrder, toast]);
+
+  useEffect(() => {
+    fetchDeliveries();
+  }, [fetchDeliveries]);
 
   const updateDeliveryStatus = async (orderId: string, newStatus: string) => {
     try {
@@ -148,10 +153,11 @@ export default function DeliveriesPage() {
       } else {
         throw new Error(result.error || "Failed to update delivery status");
       }
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: error.message,
+        description: apiError.message,
         variant: "destructive",
       });
     }
@@ -174,7 +180,7 @@ export default function DeliveriesPage() {
             ? { ...order, trackingId }
             : order
         ));
-        setSelectedOrder(null);
+        setDialogOrder(null);
         setTrackingId("");
         toast({
           title: "Success",
@@ -183,10 +189,11 @@ export default function DeliveriesPage() {
       } else {
         throw new Error(result.error || "Failed to update tracking ID");
       }
-    } catch (error: any) {
+    } catch (error) {
+      const apiError = error as ApiError;
       toast({
         title: "Error",
-        description: error.message,
+        description: apiError.message,
         variant: "destructive",
       });
     }
@@ -302,7 +309,7 @@ export default function DeliveriesPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setSelectedOrder(order)}
+                            onClick={() => setDialogOrder(order)}
                           >
                             Add Tracking ID
                           </Button>
@@ -393,6 +400,41 @@ export default function DeliveriesPage() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={!!dialogOrder} onOpenChange={() => setDialogOrder(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Tracking ID</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Input
+                id="trackingId"
+                placeholder="Enter tracking ID"
+                value={trackingId}
+                onChange={(e) => setTrackingId(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogOrder(null);
+                setTrackingId("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => dialogOrder && updateTrackingId(dialogOrder._id)}
+              disabled={!trackingId.trim()}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

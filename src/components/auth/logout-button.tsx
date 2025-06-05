@@ -21,7 +21,8 @@ export function LogoutButton({ variant = "default" }: LogoutButtonProps) {
       await handleLogout();
       router.refresh(); // Force refresh to update server components
     } catch (error) {
-      toast.error("Failed to logout. Please try again.");
+      const message = error instanceof Error ? error.message : "Failed to logout. Please try again.";
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

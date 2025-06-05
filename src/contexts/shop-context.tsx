@@ -3,6 +3,21 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from "react";
 import { useCartStore } from "@/store/useCartStore";
 
+interface Product {
+  _id: string;
+  name: string;
+  price: number;
+  quantity?: number;
+  images: string[];
+  category: {
+    _id: string;
+    name: string;
+  };
+  brand: string;
+  rating: number;
+  reviews: number;
+}
+
 interface ShopContextType {
   // Search and filtering
   searchTerm: string;
@@ -21,7 +36,7 @@ interface ShopContextType {
   isInWishlist: (productId: string) => boolean;
 
   // Cart functionality (delegated to Zustand store)
-  addToCart: (product: any) => Promise<void>;
+  addToCart: (product: Product, quantity?: number) => Promise<void>;
   removeFromCart: (productId: string) => Promise<void>;
   updateCartQuantity: (productId: string, quantity: number) => Promise<void>;
   isInCart: (productId: string) => boolean;
@@ -39,7 +54,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     if (!cartStore.initialized) {
       cartStore.loadCart();
     }
-  }, [cartStore.initialized]);
+  }, [cartStore]);
 
   // Search and filtering state
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,8 +79,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   }, [wishlist]);
 
   // Cart methods (delegated to Zustand store)
-  const addToCart = useCallback(async (product: any) => {
-    await cartStore.addItem(product);
+  const addToCart = useCallback(async (product: Product, quantity?: number) => {
+    await cartStore.addItem(product, quantity);
   }, [cartStore]);
 
   const removeFromCart = useCallback(async (productId: string) => {

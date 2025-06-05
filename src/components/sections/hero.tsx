@@ -20,7 +20,6 @@ interface HeroProduct {
 export default function Hero() {
   const [featuredProducts, setFeaturedProducts] = useState<HeroProduct[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchFeaturedProducts = async () => {
@@ -32,8 +31,6 @@ export default function Hero() {
         }
       } catch (error) {
         console.error("Error fetching featured products:", error);
-      } finally {
-        setLoading(false);
       }
     };
 

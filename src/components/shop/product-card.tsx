@@ -51,7 +51,7 @@ export default function ProductCard({ product, showAddToCart = true }: ProductCa
         title: "✔ Added to Cart",
         description: `${product.name} has been added to your cart.`,
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to add item to cart",
@@ -71,7 +71,7 @@ export default function ProductCard({ product, showAddToCart = true }: ProductCa
     try {
       setLocalQuantity(newQuantity); // Update local quantity immediately
       await updateCartQuantity(product._id, newQuantity);
-    } catch (error) {
+    } catch {
       setLocalQuantity(quantity); // Reset to server quantity on error
       toast({
         title: "Error",

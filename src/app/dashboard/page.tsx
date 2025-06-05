@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
 import { Store } from "lucide-react";
 import Link from "next/link";
 
@@ -15,7 +14,6 @@ interface VendorRequest {
 export default function DashboardPage() {
   const { data: session } = useSession();
   const [vendorRequest, setVendorRequest] = useState<VendorRequest | null>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
     // Fetch vendor request status if user is logged in

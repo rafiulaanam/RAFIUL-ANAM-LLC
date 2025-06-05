@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -26,7 +25,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 
@@ -50,13 +48,8 @@ export default function VendorRequestsPage() {
   const [filter, setFilter] = useState<string>("pending");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const { toast } = useToast();
-  const router = useRouter();
 
-  useEffect(() => {
-    fetchRequests();
-  }, [filter]);
-
-  async function fetchRequests() {
+  const fetchRequests = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/admin/vendor-requests?status=${filter}`);
@@ -76,7 +69,11 @@ export default function VendorRequestsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [filter, toast]);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
 
   async function handleStatusUpdate(requestId: string, status: "approved" | "rejected", notes: string = "") {
     try {

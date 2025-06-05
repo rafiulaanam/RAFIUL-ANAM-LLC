@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { CartProvider } from "react-use-cart";
@@ -9,7 +10,7 @@ import { Toaster } from "@/components/ui/toaster";
 
 interface ProvidersProps {
   children: ReactNode;
-  session?: any;
+  session?: Session | null;
 }
 
 export function Providers({ children, session }: ProvidersProps) {

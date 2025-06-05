@@ -76,10 +76,8 @@ export default function About() {
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
               Your Trusted Shopping Destination Since 2014
             </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              We started with a simple mission: to make quality products accessible to everyone. 
-              Today, we're proud to serve millions of customers worldwide, offering a curated 
-              selection of premium products at competitive prices.
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              We&apos;re dedicated to providing you with the best shopping experience.
             </p>
 
             <motion.ul

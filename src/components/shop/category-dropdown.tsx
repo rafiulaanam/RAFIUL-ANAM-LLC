@@ -52,8 +52,6 @@ const categories = [
 ];
 
 export function CategoryDropdown() {
-  const router = useRouter();
-
   return (
     <NavigationMenu>
       <NavigationMenuList>
@@ -108,4 +106,6 @@ const ListItem = React.forwardRef<
       </NavigationMenuLink>
     </li>
   );
-}); 
+});
+
+ListItem.displayName = "ListItem"; 
