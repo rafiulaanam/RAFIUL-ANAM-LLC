@@ -2,128 +2,103 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/db";
-import Stripe from "stripe";
+import { ObjectId } from "mongodb";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2023-10-16",
-});
+interface OrderItem {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  vendorId: string;
+}
+
+type VendorItems = {
+  [key: string]: OrderItem[];
+};
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-
-    // Check if user is logged in
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: "You must be logged in to place an order" },
+        { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
     const data = await request.json();
-    const {
-      items,
-      shippingInfo,
-      shippingMethod,
-      paymentMethod,
-      subtotal,
-      shippingCost,
-      tax,
-      total,
-    } = data;
-
-    // Validate request data
-    if (!items?.length || !shippingInfo || !shippingMethod || !paymentMethod) {
+    
+    // Validate order data
+    if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
       return NextResponse.json(
-        { error: "Invalid request data" },
+        { error: "Order must contain at least one item" },
         { status: 400 }
       );
     }
 
-    // Connect to MongoDB
     const client = await clientPromise;
     const db = client.db();
 
-    // Create order in database
-    const order = await db.collection("orders").insertOne({
-      userId: session.user.id,
-      items,
-      shippingInfo,
-      shippingMethod,
-      paymentMethod,
-      subtotal,
-      shippingCost,
-      tax,
-      total,
-      status: "pending",
-      paymentStatus: "pending",
-      createdAt: new Date(),
-    });
-
-    // Handle payment method
-    if (paymentMethod === "stripe") {
-      // Create Stripe checkout session
-      const lineItems = items.map(item => ({
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: item.name,
-            images: [item.image],
-          },
-          unit_amount: Math.round(item.price * 100), // Convert to cents
-        },
-        quantity: item.quantity,
-      }));
-
-      // Add shipping cost as a line item
-      if (shippingCost > 0) {
-        lineItems.push({
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "Shipping",
-              description: shippingMethod === "express" ? "Express Shipping" : "Standard Shipping",
-            },
-            unit_amount: Math.round(shippingCost * 100),
-          },
-          quantity: 1,
-        });
+    // Group items by vendor
+    const itemsByVendor = data.items.reduce((acc: VendorItems, item: OrderItem) => {
+      if (!acc[item.vendorId]) {
+        acc[item.vendorId] = [];
       }
+      acc[item.vendorId].push(item);
+      return acc;
+    }, {});
 
-      // Add tax as a line item
-      if (tax > 0) {
-        lineItems.push({
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "Tax",
-              description: "Sales Tax",
-            },
-            unit_amount: Math.round(tax * 100),
-          },
-          quantity: 1,
-        });
-      }
+    // Start a session for transaction
+    const dbSession = await client.startSession();
+    const orderIds: ObjectId[] = [];
 
-      const checkoutSession = await stripe.checkout.sessions.create({
-        customer_email: session.user.email || undefined,
-        line_items: lineItems,
-        mode: "payment",
-        success_url: `${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.insertedId}?success=true`,
-        cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout?canceled=true`,
-        metadata: {
-          orderId: order.insertedId.toString(),
-        },
+    try {
+      await dbSession.withTransaction(async () => {
+        // Create orders for each vendor
+        for (const [vendorId, items] of Object.entries<OrderItem[]>(itemsByVendor)) {
+          const order = {
+            userId: session.user.id,
+            vendorId,
+            items,
+            status: "pending",
+            totalAmount: items.reduce((sum: number, item: OrderItem) => sum + (item.price * item.quantity), 0),
+            shippingAddress: data.shippingAddress,
+            paymentMethod: data.paymentMethod,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+
+          const result = await db.collection("orders").insertOne(order, { session: dbSession });
+          orderIds.push(result.insertedId);
+
+          // Create notification for vendor
+          const notification = {
+            type: "NEW_ORDER",
+            title: "New Order Received",
+            message: `You have received a new order worth $${order.totalAmount.toFixed(2)}`,
+            isRead: false,
+            recipientRole: "VENDOR",
+            recipientId: vendorId,
+            relatedId: result.insertedId.toString(),
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+
+          await db.collection("notifications").insertOne(notification, { session: dbSession });
+        }
       });
 
       return NextResponse.json({
-        checkoutUrl: checkoutSession.url,
-        orderId: order.insertedId,
+        success: true,
+        data: {
+          orderIds: orderIds.map(id => id.toString())
+        }
       });
-    } else {
-      // For COD, just return the order ID
-      return NextResponse.json({ orderId: order.insertedId });
+
+    } finally {
+      await dbSession.endSession();
     }
+
   } catch (error) {
     console.error("Error creating order:", error);
     return NextResponse.json(

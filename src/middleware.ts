@@ -1,34 +1,69 @@
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { NextRequestWithAuth } from "next-auth/middleware";
+import type { NextRequest } from "next/server";
+import type { JWT } from "next-auth/jwt";
 
-export default async function middleware(request: NextRequestWithAuth) {
-  const token = await getToken({ req: request });
-  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
-  const isVendorRoute = request.nextUrl.pathname.startsWith("/vendor");
-  const isApiRoute = request.nextUrl.pathname.startsWith("/api");
+interface CustomToken extends JWT {
+  isVerified?: boolean;
+}
 
-  // Handle authentication
+export async function middleware(request: NextRequest) {
+  const token = await getToken({ req: request }) as CustomToken | null;
+  
+  // Define page types
+  const isAuthPage = request.nextUrl.pathname.startsWith("/login") || 
+                    request.nextUrl.pathname.startsWith("/register");
+  const isVerifyPage = request.nextUrl.pathname.startsWith("/verify-pending");
+  const isVerifyEmailPage = request.nextUrl.pathname.startsWith("/verify-email");
+  const isDashboardPage = request.nextUrl.pathname.startsWith("/dashboard");
+  const isProfilePage = request.nextUrl.pathname.startsWith("/profile");
+
+  // Handle verify-email page separately
+  if (isVerifyEmailPage) {
+    const hasToken = request.nextUrl.searchParams.has("token");
+    if (!hasToken) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // If user is verified, redirect away from auth and verify pages
+  if (token?.isVerified) {
+    if (isAuthPage || isVerifyPage) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // If user is logged in but not verified
+  if (token && !token.isVerified) {
+    // Allow them to stay on verify-pending
+    if (isVerifyPage) {
+      return NextResponse.next();
+    }
+    
+    // Redirect to verify-pending from protected pages
+    if (isDashboardPage || isProfilePage) {
+      return NextResponse.redirect(new URL("/verify-pending", request.url));
+    }
+
+    // Allow access to auth pages
+    if (isAuthPage) {
+      return NextResponse.next();
+    }
+  }
+
+  // If no token (not logged in)
   if (!token) {
-    if (isApiRoute) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Allow access to auth pages and verify-pending
+    if (isAuthPage || isVerifyPage) {
+      return NextResponse.next();
     }
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // Handle authorization
-  if (isAdminRoute && token.role !== "ADMIN") {
-    if (isApiRoute) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    
+    // Redirect to login for protected pages
+    if (isDashboardPage || isProfilePage) {
+      return NextResponse.redirect(new URL("/login", request.url));
     }
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
-  if (isVendorRoute && token.role !== "VENDOR") {
-    if (isApiRoute) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();
@@ -36,10 +71,11 @@ export default async function middleware(request: NextRequestWithAuth) {
 
 export const config = {
   matcher: [
-    "/admin/:path*",
-    "/vendor/:path*",
-    "/api/products/:path*",
-    "/api/categories/:path*",
-    "/api/vendors/:path*",
+    "/dashboard/:path*",
+    "/profile/:path*",
+    "/verify-pending",
+    "/verify-email",
+    "/login",
+    "/register",
   ],
-}; 
+};

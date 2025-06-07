@@ -1,0 +1,57 @@
+import { NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { NextRequestWithAuth } from "next-auth/middleware";
+
+export default async function middleware(request: NextRequestWithAuth) {
+  const token = await getToken({ req: request });
+  const isAuthPage = request.nextUrl.pathname.startsWith("/login") || 
+                    request.nextUrl.pathname.startsWith("/register");
+  const isVerifyPage = request.nextUrl.pathname.startsWith("/verify-pending");
+  const isVerifyEmailPage = request.nextUrl.pathname.startsWith("/verify-email");
+
+  // Allow access to verify-email page with token
+  if (isVerifyEmailPage) {
+    const hasToken = request.nextUrl.searchParams.has("token");
+    if (!hasToken) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // If user is logged in and verified, redirect from auth pages
+  if (token?.isVerified && (isAuthPage || isVerifyPage)) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // If user is logged in but not verified
+  if (token && !token.isVerified) {
+    // Allow access to verify-pending page
+    if (isVerifyPage) {
+      return NextResponse.next();
+    }
+    
+    // Redirect to verify-pending for all other pages except auth pages
+    if (!isAuthPage) {
+      return NextResponse.redirect(new URL("/verify-pending", request.url));
+    }
+  }
+
+  // If user is not logged in and trying to access protected routes
+  // (except verify-pending which handles its own auth state)
+  if (!token && !isAuthPage && !isVerifyPage) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    "/dashboard/:path*",
+    "/profile/:path*",
+    "/verify-pending",
+    "/verify-email",
+    "/login",
+    "/register",
+  ],
+};

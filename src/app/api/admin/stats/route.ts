@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/db";
-import Product from "@/models/Product";
-import User from "@/models/User";
-import Vendor from "@/models/Vendor";
-import Order from "@/models/Order";
 import { getServerSession } from "next-auth";
 import { isAdmin, authOptions } from "@/lib/auth";
 
@@ -15,7 +11,9 @@ export async function GET() {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    await clientPromise();
+    // Get MongoDB client
+    const client = await clientPromise;
+    const db = client.db();
 
     // Get counts
     const [
@@ -25,11 +23,11 @@ export async function GET() {
       totalOrders,
       topProducts,
     ] = await Promise.all([
-      Product.countDocuments({ isActive: true }),
-      User.countDocuments({ isActive: true }),
-      Vendor.countDocuments({ isActive: true }),
-      Order.countDocuments(),
-      Product.aggregate([
+      db.collection("products").countDocuments({ isActive: true }),
+      db.collection("users").countDocuments({ isActive: true }),
+      db.collection("vendors").countDocuments({ isActive: true }),
+      db.collection("orders").countDocuments(),
+      db.collection("products").aggregate([
         {
           $lookup: {
             from: "orders",
@@ -46,7 +44,7 @@ export async function GET() {
         },
         { $sort: { sales: -1 } },
         { $limit: 5 }
-      ])
+      ]).toArray()
     ]);
 
     // Calculate revenue statistics
@@ -56,7 +54,7 @@ export async function GET() {
     previousMonth.setMonth(previousMonth.getMonth() - 1);
 
     const [currentRevenue, previousRevenue] = await Promise.all([
-      Order.aggregate([
+      db.collection("orders").aggregate([
         {
           $match: {
             createdAt: { $gte: currentMonth }
@@ -68,8 +66,8 @@ export async function GET() {
             total: { $sum: "$total" }
           }
         }
-      ]),
-      Order.aggregate([
+      ]).toArray(),
+      db.collection("orders").aggregate([
         {
           $match: {
             createdAt: {
@@ -84,7 +82,7 @@ export async function GET() {
             total: { $sum: "$total" }
           }
         }
-      ])
+      ]).toArray()
     ]);
 
     const currentTotal = currentRevenue[0]?.total || 0;

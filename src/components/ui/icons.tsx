@@ -10,6 +10,8 @@ import {
   MapPin,
   Settings,
   HelpCircle,
+  Check,
+  AlertTriangle,
   type Icon as LucideIcon,
 } from "lucide-react";
 
@@ -28,6 +30,8 @@ export const Icons = {
   mapPin: MapPin,
   settings: Settings,
   help: HelpCircle,
+  check: Check,
+  warning: AlertTriangle,
   google: (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" {...props}>
       <path

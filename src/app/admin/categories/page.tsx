@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import ImageUpload from "@/components/ui/image-upload";
+import Image from "next/image";
 
 interface Category {
   _id: string;
@@ -218,7 +219,7 @@ export default function CategoriesPage() {
           <AlertDialogTitle>Delete Category</AlertDialogTitle>
           <AlertDialogDescription className="space-y-4">
             <p>
-              Are you sure you want to delete the category "{category?.name}"? This action cannot be undone.
+              Are you sure you want to delete the category &quot;{category?.name}&quot;? This action cannot be undone.
             </p>
             
             {productsUsingCategory.length > 0 && (
@@ -411,10 +412,12 @@ export default function CategoriesPage() {
                 {category.image ? (
                   <div className="aspect-[4/3] relative overflow-hidden">
                     <div className="absolute inset-0 bg-black/5" />
-                    <img
+                    <Image
                       src={category.image}
                       alt={category.name}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      fill
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       onError={(e) => {
                         const img = e.target as HTMLImageElement;
                         img.src = 'https://via.placeholder.com/400x300?text=No+Image';

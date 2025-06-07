@@ -2,15 +2,16 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/db";
-import { ObjectId, ClientSession } from "mongodb";
+import { ObjectId } from "mongodb";
 
+// GET single vendor request
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const authSession = await getServerSession(authOptions);
-    if (!authSession?.user?.email || authSession.user.role !== "ADMIN") {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email || session.user.role !== "ADMIN") {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -28,9 +29,9 @@ export async function GET(
     const client = await clientPromise;
     const db = client.db();
 
-    // Get vendor request details
+    // Get vendor request details with user information
     const vendorRequest = await db
-      .collection("vendorRequests")
+      .collection("vendorrequests")
       .aggregate([
         {
           $match: {
@@ -40,8 +41,16 @@ export async function GET(
         {
           $lookup: {
             from: "users",
-            localField: "userId",
-            foreignField: "_id",
+            let: { userId: { $toObjectId: "$userId" } },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $eq: ["$_id", "$$userId"]
+                  }
+                }
+              }
+            ],
             as: "user"
           }
         },
@@ -58,17 +67,17 @@ export async function GET(
             name: "$user.name",
             email: "$user.email",
             image: "$user.image",
-            phone: 1,
-            address: 1,
+            phone: "$user.phone",
+            address: "$user.address",
             storeName: 1,
             storeDescription: 1,
-            documents: 1,
-            status: 1,
-            createdAt: 1,
-            updatedAt: 1,
+            logo: 1,
             businessType: 1,
             registrationNumber: 1,
             taxId: 1,
+            status: 1,
+            createdAt: 1,
+            updatedAt: 1,
             processedBy: 1,
             processedAt: 1
           }
@@ -78,7 +87,7 @@ export async function GET(
 
     if (!vendorRequest) {
       return NextResponse.json(
-        { error: "Request not found" },
+        { error: "Vendor request not found" },
         { status: 404 }
       );
     }
@@ -97,13 +106,14 @@ export async function GET(
   }
 }
 
+// PATCH update vendor request status
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const authSession = await getServerSession(authOptions);
-    if (!authSession?.user?.email || authSession.user.role !== "ADMIN") {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email || session.user.role !== "ADMIN") {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -119,7 +129,9 @@ export async function PATCH(
     }
 
     const data = await request.json();
-    if (!data.status || !["approved", "rejected"].includes(data.status)) {
+    const { status } = data;
+
+    if (!status || !["approved", "rejected"].includes(status)) {
       return NextResponse.json(
         { error: "Invalid status" },
         { status: 400 }
@@ -129,43 +141,43 @@ export async function PATCH(
     const client = await clientPromise;
     const db = client.db();
 
-    // Start a MongoDB session for the transaction
-    const mongoSession: ClientSession = client.startSession();
+    // Start a session for transaction
+    const mongoSession = client.startSession();
 
     try {
       await mongoSession.withTransaction(async () => {
         // Get the vendor request
         const vendorRequest = await db
-          .collection("vendorRequests")
+          .collection("vendorrequests")
           .findOne(
             { _id: new ObjectId(id) },
             { session: mongoSession }
           );
 
         if (!vendorRequest) {
-          throw new Error("Request not found");
+          throw new Error("Vendor request not found");
         }
 
         if (vendorRequest.status !== "pending") {
           throw new Error("Request has already been processed");
         }
 
-        // Update the request status
-        await db.collection("vendorRequests").updateOne(
+        // Update vendor request status
+        await db.collection("vendorrequests").updateOne(
           { _id: new ObjectId(id) },
           {
             $set: {
-              status: data.status,
-              updatedAt: new Date(),
-              processedBy: authSession.user.email,
-              processedAt: new Date()
+              status,
+              processedBy: session.user.email,
+              processedAt: new Date(),
+              updatedAt: new Date()
             }
           },
           { session: mongoSession }
         );
 
-        // If approved, update the user's role to VENDOR
-        if (data.status === "approved") {
+        // If approved, update user role to VENDOR
+        if (status === "approved") {
           await db.collection("users").updateOne(
             { _id: new ObjectId(vendorRequest.userId) },
             {
@@ -184,23 +196,11 @@ export async function PATCH(
             { session: mongoSession }
           );
         }
-
-        // Create a notification for the vendor
-        await db.collection("notifications").insertOne({
-          userId: new ObjectId(vendorRequest.userId),
-          type: "VENDOR_REQUEST",
-          title: data.status === "approved" ? "Vendor Application Approved" : "Vendor Application Rejected",
-          message: data.status === "approved"
-            ? "Congratulations! Your vendor application has been approved. You can now start selling on our platform."
-            : "Your vendor application has been rejected. Please contact support for more information.",
-          isRead: false,
-          createdAt: new Date()
-        }, { session: mongoSession });
       });
 
       return NextResponse.json({
         success: true,
-        message: `Vendor request ${data.status} successfully`
+        message: `Vendor request ${status} successfully`
       });
 
     } finally {
@@ -211,7 +211,7 @@ export async function PATCH(
     console.error("Error updating vendor request:", error);
     return NextResponse.json(
       { 
-        error: error instanceof Error ? error.message : "Failed to update vendor request"
+        error: error instanceof Error ? error.message : "Failed to update vendor request" 
       },
       { status: 500 }
     );

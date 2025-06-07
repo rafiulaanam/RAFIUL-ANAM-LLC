@@ -4,6 +4,17 @@ import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/db";
 import { ObjectId } from "mongodb";
 
+interface CategoryUpdate {
+  name: string;
+  slug: string;
+  description: string;
+  image?: string | null;
+  status?: "active" | "inactive";
+  updatedAt: Date;
+  updatedBy: string;
+  isActive?: boolean;
+}
+
 // Helper function to create slug from name
 function createSlug(name: string): string {
   return name
@@ -183,7 +194,7 @@ export async function PATCH(req: Request) {
     }
 
     const slug = createSlug(name);
-    const updateData: any = {
+    const updateData: CategoryUpdate = {
       name,
       slug,
       description,

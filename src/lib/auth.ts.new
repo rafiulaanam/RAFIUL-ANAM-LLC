@@ -19,7 +19,6 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/login",
     error: "/login",
-    verifyRequest: "/verify-pending",
   },
   session: {
     strategy: "jwt",
@@ -57,7 +56,7 @@ export const authOptions: NextAuthOptions = {
 
           console.log(`Attempting to find user with email: ${email}`);
 
-          // Find user with minimal projection
+          // Find user with all necessary fields
           const user = await db.collection("users").findOne(
             { email },
             {
@@ -69,9 +68,7 @@ export const authOptions: NextAuthOptions = {
                 role: 1,
                 isActive: 1,
                 isVerified: 1,
-                image: 1,
-                verificationToken: 1,
-                verificationTokenExpiry: 1
+                image: 1
               }
             }
           );
@@ -101,16 +98,9 @@ export const authOptions: NextAuthOptions = {
             throw new Error("Your account is not active. Please contact support.");
           }
 
-          // Check if user is verified
           if (!user.isVerified) {
-            // Check if they have a valid verification token
-            const hasValidToken = user.verificationToken && user.verificationTokenExpiry && new Date(user.verificationTokenExpiry) > new Date();
-            
-            if (hasValidToken) {
-              throw new Error("Please verify your email before logging in. Check your inbox for the verification link.");
-            } else {
-              throw new Error("Your email is not verified. Please request a new verification link.");
-            }
+            console.log('User email is not verified');
+            throw new Error("Please verify your email address before logging in.");
           }
 
           // Verify password
@@ -125,14 +115,24 @@ export const authOptions: NextAuthOptions = {
             throw new Error("Invalid password. Please try again.");
           }
 
-          // Return user data with verification status
+          // Update last login timestamp
+          await db.collection("users").updateOne(
+            { _id: user._id },
+            { 
+              $set: { 
+                lastLogin: new Date(),
+                updatedAt: new Date()
+              } 
+            }
+          );
+
+          // Return user data
           return {
             id: user._id.toString(),
             email: user.email,
             name: user.name,
             image: user.image || null,
-            role: user.role || 'USER',
-            isVerified: user.isVerified || false,
+            role: user.role || 'USER', // Default to USER if role is not set
           };
         } catch (error) {
           console.error("Authentication error:", error);
@@ -153,7 +153,6 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = user.role;
         token.id = user.id;
-        token.isVerified = user.isVerified;
       }
 
       return token;
@@ -165,7 +164,6 @@ export const authOptions: NextAuthOptions = {
         session.user.email = token.email as string;
         session.user.name = token.name as string;
         session.user.image = token.picture as string | null;
-        session.user.isVerified = token.isVerified as boolean;
       }
       return session;
     },

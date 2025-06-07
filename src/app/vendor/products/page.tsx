@@ -32,6 +32,11 @@ const STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
 ];
 
+interface Category {
+  _id: string;
+  name: string;
+}
+
 export default function VendorProductsPage() {
   const { data: session } = useSession();
   const [products, setProducts] = useState<Product[]>([]);
@@ -39,7 +44,7 @@ export default function VendorProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [categories, setCategories] = useState<{ _id: string; name: string; }[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,11 +59,11 @@ export default function VendorProductsPage() {
         ...(categoryFilter !== "all" && { category: categoryFilter }),
       });
 
-      const response = await fetch(`/api/products?${queryParams}`);
+      const response = await fetch(`/api/vendor/products?${queryParams}`);
       if (!response.ok) throw new Error("Failed to fetch products");
 
       const data = await response.json();
-      setProducts(data.products);
+      setProducts(data.products || []);
     } catch (error) {
       console.error("Error fetching products:", error);
       toast({
@@ -66,6 +71,7 @@ export default function VendorProductsPage() {
         description: "Failed to fetch products",
         variant: "destructive",
       });
+      setProducts([]);
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +83,7 @@ export default function VendorProductsPage() {
       if (!response.ok) throw new Error("Failed to fetch categories");
 
       const data = await response.json();
-      setCategories(data.categories);
+      setCategories(data.categories || []);
     } catch (error) {
       console.error("Error fetching categories:", error);
       toast({
@@ -85,12 +91,15 @@ export default function VendorProductsPage() {
         description: "Failed to fetch categories",
         variant: "destructive",
       });
+      setCategories([]);
     }
   }, [toast]);
 
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    if (session?.user) {
+      fetchProducts();
+    }
+  }, [fetchProducts, session]);
 
   useEffect(() => {
     fetchCategories();
@@ -99,7 +108,7 @@ export default function VendorProductsPage() {
   const handleCreateProduct = async (data: Omit<Product, "_id">) => {
     try {
       setIsSubmitting(true);
-      const response = await fetch("/api/products", {
+      const response = await fetch("/api/vendor/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -129,7 +138,7 @@ export default function VendorProductsPage() {
   const handleUpdateProduct = async (data: Product) => {
     try {
       setIsSubmitting(true);
-      const response = await fetch("/api/products", {
+      const response = await fetch(`/api/vendor/products/${data._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -159,7 +168,7 @@ export default function VendorProductsPage() {
 
   const handleDeleteProduct = async (productId: string) => {
     try {
-      const response = await fetch(`/api/products?id=${productId}`, {
+      const response = await fetch(`/api/vendor/products/${productId}`, {
         method: "DELETE",
       });
 
@@ -233,7 +242,7 @@ export default function VendorProductsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {categories.map((category) => (
+            {categories?.map((category) => (
               <SelectItem key={category._id} value={category._id}>
                 {category.name}
               </SelectItem>
@@ -245,25 +254,15 @@ export default function VendorProductsPage() {
       {isLoading ? (
         <div className="flex justify-center py-8">Loading...</div>
       ) : (
-        <div className="space-y-4">
-          {products.map((product) => (
-            <ProductList
-              key={product._id}
-              product={product}
-              onEdit={handleEdit}
-              onDelete={handleDeleteProduct}
-            />
-          ))}
-          {products.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No products found
-            </div>
-          )}
-        </div>
+        <ProductList
+          products={products}
+          onEdit={handleEdit}
+          onDelete={handleDeleteProduct}
+        />
       )}
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {selectedProduct ? "Edit Product" : "Add New Product"}
@@ -276,12 +275,8 @@ export default function VendorProductsPage() {
           </DialogHeader>
           <ProductForm
             categories={categories}
-            initialData={selectedProduct || undefined}
+            initialData={selectedProduct}
             onSubmit={selectedProduct ? handleUpdateProduct : handleCreateProduct}
-            onCancel={() => {
-              setIsFormOpen(false);
-              setSelectedProduct(null);
-            }}
             isSubmitting={isSubmitting}
           />
         </DialogContent>

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import clientPromise from "@/lib/db";
-import { ObjectId } from "mongodb";
 
 // POST new vendor request
 export async function POST(request: Request) {
@@ -18,37 +17,37 @@ export async function POST(request: Request) {
     const data = await request.json();
     
     // Validate required fields
-    if (!data.storeName || !data.storeDescription) {
-      return NextResponse.json(
-        { error: "Store name and description are required" },
-        { status: 400 }
-      );
+    const requiredFields = [
+      "businessName",
+      "ownerName",
+      "email",
+      "phone",
+      "address",
+      "businessType",
+      "description"
+    ];
+
+    for (const field of requiredFields) {
+      if (!data[field]) {
+        return NextResponse.json(
+          { error: `${field} is required` },
+          { status: 400 }
+        );
+      }
     }
 
     const client = await clientPromise;
     const db = client.db();
 
-    // Check if user already has a pending request
-    const existingRequest = await db.collection("vendorrequests").findOne({
+    // Check if user already has a pending or approved request
+    const existingRequest = await db.collection("vendor_requests").findOne({
       userId: session.user.id,
-      status: "pending"
+      status: { $in: ["pending", "approved"] }
     });
 
     if (existingRequest) {
       return NextResponse.json(
-        { error: "You already have a pending vendor request" },
-        { status: 400 }
-      );
-    }
-
-    // Check if user is already a vendor
-    const user = await db.collection("users").findOne({
-      _id: new ObjectId(session.user.id)
-    });
-
-    if (user?.role === "VENDOR") {
-      return NextResponse.json(
-        { error: "You are already a vendor" },
+        { error: "You already have a pending or approved vendor request" },
         { status: 400 }
       );
     }
@@ -56,21 +55,32 @@ export async function POST(request: Request) {
     // Create vendor request
     const vendorRequest = {
       userId: session.user.id,
-      storeName: data.storeName,
-      storeDescription: data.storeDescription,
-      logo: data.logo || null,
+      ...data,
       status: "pending",
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
-    const result = await db.collection("vendorrequests").insertOne(vendorRequest);
+    const result = await db.collection("vendor_requests").insertOne(vendorRequest);
+
+    // Create notification for admin
+    const notification = {
+      type: "VENDOR_REQUEST",
+      title: "New Vendor Request",
+      message: `${data.businessName} has submitted a vendor application`,
+      isRead: false,
+      recipientRole: "ADMIN",
+      relatedId: result.insertedId.toString(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    await db.collection("notifications").insertOne(notification);
 
     return NextResponse.json({
       success: true,
       data: {
-        ...vendorRequest,
-        _id: result.insertedId
+        requestId: result.insertedId.toString()
       }
     });
 
@@ -97,16 +107,12 @@ export async function GET() {
     const client = await clientPromise;
     const db = client.db();
 
-    const vendorRequest = await db.collection("vendorrequests")
-      .findOne(
-        { userId: session.user.id },
-        { sort: { createdAt: -1 } }
-      );
-
-    return NextResponse.json({
-      success: true,
-      data: vendorRequest
+    // Get user's vendor request
+    const request = await db.collection("vendor_requests").findOne({
+      userId: session.user.id
     });
+
+    return NextResponse.json(request);
 
   } catch (error) {
     console.error("Error fetching vendor request:", error);

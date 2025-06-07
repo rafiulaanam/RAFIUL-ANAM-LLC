@@ -3,6 +3,19 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { v2 as cloudinary } from "cloudinary";
 
+interface CloudinaryUploadOptions {
+  folder: string;
+  resource_type: "auto" | "image" | "video" | "raw";
+  allowed_formats: string[];
+  transformation?: Array<{
+    width?: number;
+    height?: number;
+    crop?: string;
+    quality?: string;
+    fetch_format?: string;
+  }>;
+}
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -36,7 +49,7 @@ export async function POST(request: Request) {
     const fileBase64 = `data:${file.type};base64,${buffer.toString("base64")}`;
 
     // Set upload options based on type
-    const uploadOptions: any = {
+    const uploadOptions: CloudinaryUploadOptions = {
       folder: type,
       resource_type: "auto",
       allowed_formats: ["jpg", "png", "jpeg", "gif", "webp"],

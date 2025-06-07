@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { AdminSidebar } from "@/components/admin/sidebar";
+import NotificationBell from "@/components/admin/NotificationBell";
 
 export default function AdminLayout({
   children,
@@ -43,7 +44,18 @@ export default function AdminLayout({
   return (
     <div className="flex min-h-screen">
       <AdminSidebar />
-      <main className="flex-1 p-8">{children}</main>
+      <div className="flex-1 flex flex-col">
+        <header className="h-16 border-b bg-white dark:bg-gray-800 px-4 flex items-center justify-between">
+          <h1 className="text-lg font-semibold">Admin Dashboard</h1>
+          <div className="flex items-center gap-4">
+            <NotificationBell />
+            <span className="text-sm">
+              Welcome, {session.user.name}
+            </span>
+          </div>
+        </header>
+        <main className="flex-1 overflow-auto p-4">{children}</main>
+      </div>
     </div>
   );
 } 
