@@ -17,7 +17,7 @@ export async function GET(
     await connectToDatabase();
 
     const post = await BlogPost.findById(params.postId)
-      .populate("author", "name email")
+      .populate("author", "name email image")
       .populate("categories", "name");
 
     if (!post) {
@@ -42,7 +42,18 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { title, content, excerpt, status, categories, tags, seo } = body;
+    const { 
+      title, 
+      content, 
+      excerpt, 
+      status, 
+      categories, 
+      tags, 
+      seo,
+      coverImage,
+      isPublished,
+      isFeatured 
+    } = body;
 
     await connectToDatabase();
 
@@ -60,7 +71,7 @@ export async function PATCH(
     }
 
     // Update fields
-    Object.assign(post, {
+    const updateData = {
       ...(title && { title }),
       ...(content && { content }),
       ...(excerpt && { excerpt }),
@@ -68,11 +79,20 @@ export async function PATCH(
       ...(categories && { categories }),
       ...(tags && { tags }),
       ...(seo && { seo }),
-    });
+      ...(coverImage && { coverImage }),
+      ...(typeof isPublished === 'boolean' && { isPublished }),
+      ...(typeof isFeatured === 'boolean' && { isFeatured })
+    };
 
-    await post.save();
+    // Update the post with the new data
+    const updatedPost = await BlogPost.findByIdAndUpdate(
+      params.postId,
+      updateData,
+      { new: true, runValidators: true }
+    ).populate("author", "name email image")
+     .populate("categories", "name");
 
-    return NextResponse.json(post);
+    return NextResponse.json(updatedPost);
   } catch (error) {
     console.error("[BLOG_POST_PATCH]", error);
     return new NextResponse("Internal error", { status: 500 });

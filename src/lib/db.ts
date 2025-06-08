@@ -52,4 +52,15 @@ class Database {
 const database = Database.getInstance();
 const clientPromise = database.clientPromise;
 
-export default clientPromise; 
+export default clientPromise;
+
+// Add a helper function to connect to the database
+export async function connectToDatabase() {
+  try {
+    const client = await clientPromise;
+    return client;
+  } catch (error) {
+    console.error('Failed to connect to database:', error);
+    throw error;
+  }
+} 

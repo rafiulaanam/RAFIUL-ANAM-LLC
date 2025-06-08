@@ -28,15 +28,29 @@ const blogPostSchema = new Schema({
       message: 'Cover image must be a valid URL'
     }
   },
+  categories: [{
+    type: Schema.Types.ObjectId,
+    ref: 'Category'
+  }],
   tags: [{
     type: String,
     trim: true
   }],
   author: {
-    id: { type: String, required: true },
-    name: String,
-    email: String,
-    image: String
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['draft', 'published', 'archived'],
+    default: 'draft'
+  },
+  seo: {
+    title: String,
+    description: String,
+    keywords: [String],
+    ogImage: String
   },
   isPublished: {
     type: Boolean,
@@ -60,10 +74,9 @@ const blogPostSchema = new Schema({
       required: true
     },
     author: {
-      id: { type: String, required: true },
-      name: String,
-      email: String,
-      image: String
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
     },
     createdAt: {
       type: Date,
