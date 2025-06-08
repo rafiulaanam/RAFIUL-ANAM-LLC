@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "react-quill/dist/quill.snow.css";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { SessionProvider } from "@/providers/session-provider";

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { v2 as cloudinary } from "cloudinary";
+import { connectToDatabase } from "@/lib/db";
 
 interface CloudinaryUploadOptions {
   folder: string;
@@ -16,14 +17,32 @@ interface CloudinaryUploadOptions {
   }>;
 }
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
 export async function POST(request: Request) {
   try {
+    // Connect to database first
+    await connectToDatabase();
+
+    // Configure Cloudinary
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    // Verify Cloudinary configuration
+    const config = cloudinary.config();
+    if (!config.cloud_name || !config.api_key || !config.api_secret) {
+      console.error("Invalid Cloudinary configuration:", {
+        cloud_name: !!config.cloud_name,
+        api_key: !!config.api_key,
+        api_secret: !!config.api_secret,
+      });
+      return NextResponse.json(
+        { error: "Invalid Cloudinary configuration" },
+        { status: 500 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.role || !["ADMIN", "VENDOR"].includes(session.user.role)) {
       return NextResponse.json(
@@ -71,7 +90,29 @@ export async function POST(request: Request) {
     }
 
     // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(fileBase64, uploadOptions);
+    let result;
+    try {
+      result = await cloudinary.uploader.upload(fileBase64, uploadOptions);
+    } catch (cloudinaryError: unknown) {
+      console.error("Cloudinary upload error:", {
+        error: cloudinaryError,
+        config: {
+          cloud_name: !!config.cloud_name,
+          api_key: !!config.api_key,
+          api_secret: !!config.api_secret,
+        }
+      });
+      const errorMessage = cloudinaryError instanceof Error 
+        ? cloudinaryError.message 
+        : typeof cloudinaryError === 'object' && cloudinaryError !== null && 'message' in cloudinaryError
+          ? String(cloudinaryError.message)
+          : "Failed to upload to Cloudinary";
+      
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -83,7 +124,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error uploading file:", error);
     return NextResponse.json(
-      { error: "Failed to upload file" },
+      { error: error instanceof Error ? error.message : "Failed to upload file" },
       { status: 500 }
     );
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
@@ -37,20 +37,24 @@ export default function VendorRequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
-  const fetchRequest = async () => {
+  const fetchRequest = useCallback(async () => {
     try {
-      const response = await fetch(`/api/admin/vendor-requests/${params.id}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch request");
-      }
+      setLoading(true);
+      const response = await fetch(`/api/admin/vendors/requests/${params.id}`);
       const data = await response.json();
-      setRequest(data);
-    } catch {
-      toast.error("Error fetching request details");
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch request');
+      }
+
+      setRequest(data.data);
+    } catch (error) {
+      console.error('Error fetching request:', error);
+      toast.error('Failed to fetch vendor request');
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
 
   useEffect(() => {
     if (session?.user) {
