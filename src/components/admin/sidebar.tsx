@@ -73,61 +73,61 @@ export function AdminSidebar() {
       </div>
       <nav className="flex-1 overflow-y-auto px-2 py-4">
         <div className="space-y-1">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href;
-            const hasChildren = item.children && item.children.length > 0;
+        {navigation.map((item) => {
+          const isActive = pathname === item.href;
+          const hasChildren = item.children && item.children.length > 0;
 
-            return (
-              <div key={item.href}>
-                <Link
-                  href={item.href}
-                  className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium ${
+          return (
+            <div key={item.href}>
+              <Link
+                href={item.href}
+                className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium ${
+                  isActive
+                    ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                }`}
+              >
+                <item.icon
+                  className={`mr-3 h-5 w-5 flex-shrink-0 ${
                     isActive
-                      ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                      ? "text-gray-500 dark:text-gray-200"
+                      : "text-gray-400 group-hover:text-gray-500 dark:text-gray-300 dark:group-hover:text-gray-200"
                   }`}
-                >
-                  <item.icon
-                    className={`mr-3 h-5 w-5 flex-shrink-0 ${
-                      isActive
-                        ? "text-gray-500 dark:text-gray-200"
-                        : "text-gray-400 group-hover:text-gray-500 dark:text-gray-300 dark:group-hover:text-gray-200"
-                    }`}
-                    aria-hidden="true"
-                  />
-                  {item.name}
-                </Link>
-                {hasChildren && (
-                  <div className="ml-8 mt-1 space-y-1">
-                    {item.children.map((child) => {
-                      const isChildActive = pathname === child.href;
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium ${
+                  aria-hidden="true"
+                />
+                {item.name}
+              </Link>
+              {hasChildren && (
+                <div className="ml-8 mt-1 space-y-1">
+                  {item.children.map((child) => {
+                    const isChildActive = pathname === child.href;
+                    return (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium ${
+                          isChildActive
+                            ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                        }`}
+                      >
+                        <child.icon
+                          className={`mr-3 h-4 w-4 flex-shrink-0 ${
                             isChildActive
-                              ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
-                              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                              ? "text-gray-500 dark:text-gray-200"
+                              : "text-gray-400 group-hover:text-gray-500 dark:text-gray-300 dark:group-hover:text-gray-200"
                           }`}
-                        >
-                          <child.icon
-                            className={`mr-3 h-4 w-4 flex-shrink-0 ${
-                              isChildActive
-                                ? "text-gray-500 dark:text-gray-200"
-                                : "text-gray-400 group-hover:text-gray-500 dark:text-gray-300 dark:group-hover:text-gray-200"
-                            }`}
-                            aria-hidden="true"
-                          />
-                          {child.name}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                          aria-hidden="true"
+                        />
+                        {child.name}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
         </div>
       </nav>
     </div>
